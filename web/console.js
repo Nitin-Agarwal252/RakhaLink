@@ -6,11 +6,13 @@ const viewAsEl = document.querySelector('#view-as');
 const dutyToggleEl = document.querySelector('#duty-toggle');
 const metricValueEl = document.querySelector('#metric-value');
 const metricCountEl = document.querySelector('#metric-count');
+const queueTabs = [...document.querySelectorAll('[data-queue-view]')];
 const selectedMap = new Map();
 let events = [];
 let responders = [];
 let currentRole = '';
 let selectedId = null;
+let queueView = 'active';
 let eventSource;
 
 const categories = {
@@ -114,18 +116,29 @@ async function toggleDuty() {
 }
 
 function render() {
-  const activeCount = events.filter(item => !['resolved', 'unanswered'].includes(item.status)).length;
-  countEl.textContent = String(activeCount);
-  if (events.length === 0) {
-    queueEl.replaceChildren(makeEmpty('✓', 'All clear', 'No alerts are in the queue.'));
+  const closedStatuses = ['resolved', 'unanswered'];
+  const visibleEvents = events.filter(item => queueView === 'history' ? closedStatuses.includes(item.status) : !closedStatuses.includes(item.status));
+  countEl.textContent = String(visibleEvents.length);
+  queueTabs.forEach(tab => {
+    const selected = tab.dataset.queueView === queueView;
+    tab.classList.toggle('selected', selected);
+    tab.setAttribute('aria-selected', String(selected));
+  });
+  if (visibleEvents.length === 0) {
+    const empty = queueView === 'history'
+      ? makeEmpty('↺', 'No history yet', 'Resolved and unanswered alerts from this demo session will appear here.')
+      : makeEmpty('✓', 'All clear', 'No active alerts are in the queue.');
+    queueEl.replaceChildren(empty);
     renderDetails(null);
     return;
   }
+  if (!visibleEvents.some(item => item.id === selectedId)) selectedId = visibleEvents[0].id;
   const fragment = document.createDocumentFragment();
-  for (const item of events) {
+  for (const item of visibleEvents) {
     const category = categories[item.category] || { label: 'Alert', glyph: '!', color: '#47584c' };
     const button = document.createElement('button');
     button.type = 'button';
+    button.dataset.eventId = item.id;
     button.className = `queue-card${item.id === selectedId ? ' selected' : ''}${item.status === 'dispatched' ? ' incoming' : ''}`;
     button.setAttribute('aria-pressed', String(item.id === selectedId));
     const top = document.createElement('div'); top.className = 'queue-card-top';
@@ -143,7 +156,7 @@ function render() {
     fragment.append(button);
   }
   queueEl.replaceChildren(fragment);
-  renderDetails(events.find(item => item.id === selectedId) || null);
+  renderDetails(visibleEvents.find(item => item.id === selectedId) || null);
 }
 
 function makeEmpty(icon, title, message) {
@@ -359,6 +372,11 @@ viewAsEl.addEventListener('change', async () => {
   eventSource.onerror = () => setConnection(false);
   for (const type of ['alert', 'status', 'escalated', 'unanswered', 'reset', 'duty']) eventSource.addEventListener(type, () => { loadResponders(); loadEvents(); });
 });
+queueTabs.forEach(tab => tab.addEventListener('click', () => {
+  queueView = tab.dataset.queueView;
+  selectedId = null;
+  render();
+}));
 dutyToggleEl.addEventListener('click', toggleDuty);
 document.querySelector('#refresh').addEventListener('click', () => loadEvents());
 loadResponders().then(loadEvents);
@@ -376,8 +394,8 @@ setInterval(() => {
 }, 1000);
 setInterval(() => loadEvents(true), 8000);
 function renderQueueAges() {
-  for (const [index, button] of [...queueEl.querySelectorAll('.queue-card')].entries()) {
-    const item = events[index];
+  for (const button of queueEl.querySelectorAll('.queue-card')) {
+    const item = events.find(row => row.id === button.dataset.eventId);
     const time = button.querySelector('.queue-meta span:last-child');
     if (item && time) time.textContent = formatAge(item.created_at);
   }

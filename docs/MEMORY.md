@@ -30,6 +30,7 @@
 - SOS status and console now show an in-memory `SIMULATED FAMILY ALERT` record with `sent: false`, no destination, and the explicit message that no contact was notified. No family contact is collected, stored, or messaged.
 - Began T3 responder-entered ETA: console has an optional whole-minute input on the On the way action, API events return the responder-supplied value, and the rider labels it as an estimate. No computed ETA is introduced.
 - ETA mock integration passed: accepted a medical alert, recorded an 18-minute responder-entered estimate on `enroute`, and verified both rider status and console event API return 18; an ETA supplied on `arrived` was rejected (HTTP 400).
+- T3 responder history view: console Active/History tabs split live statuses from resolved/unanswered alerts using the existing in-memory events feed. History is explicitly limited to this server session. Frontend-only change; no API or Expo process restart.
 
 ### Verification
 - `npm test`: 5 passed, 0 failed; server and console JavaScript syntax checks passed.

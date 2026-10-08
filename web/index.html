@@ -18,8 +18,12 @@
       <section class="console-grid" aria-label="Responder console">
         <aside class="panel queue-panel" aria-label="Alert queue">
           <div class="panel-heading"><div><p class="eyebrow">INCOMING</p><h2>Alert queue</h2></div><span id="queue-count" class="count">0</span></div>
+          <div class="queue-tabs" role="tablist" aria-label="Responder alert views">
+            <button type="button" role="tab" aria-selected="true" class="queue-tab selected" data-queue-view="active">Active</button>
+            <button type="button" role="tab" aria-selected="false" class="queue-tab" data-queue-view="history">History</button>
+          </div>
           <div id="queue" class="queue-list"><div class="empty-state"><span class="empty-icon">✓</span><strong>All clear</strong><span>No alerts are in the queue.</span></div></div>
-          <div class="panel-foot">Alerts and responder records in this demo use sample data.</div>
+          <div class="panel-foot">History shows resolved or unanswered alerts from this demo session. It clears when the server restarts.</div>
         </aside>
         <section class="panel map-panel" aria-label="Alert map">
           <div class="panel-heading"><div><p class="eyebrow">LOCATION</p><h2>Rider location</h2></div><span id="map-label" class="map-label">Select an alert</span></div>
