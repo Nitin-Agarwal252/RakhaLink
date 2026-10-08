@@ -32,7 +32,7 @@
   <tr>
     <td align="center" width="33%"><b>Four SOS paths</b><br><sub>Fuel, breakdown, accident, and medical requests use sample locations and deterministic routing.</sub></td>
     <td align="center" width="33%"><b>Responder workflow</b><br><sub>One on-duty responder is notified at a time. If they time out or decline, the next eligible match is tried.</sub></td>
-    <td align="center" width="33%"><b>Offline support</b><br><sub>Queued SOS drafts persist locally and the screen flashes Morse. A team SMS draft requires a configured whitelist.</sub></td>
+    <td align="center" width="33%"><b>Offline support</b><br><sub>Queued SOS drafts persist locally and the screen flashes Morse. A manual team SMS draft requires an approved whitelist.</sub></td>
   </tr>
 </table>
 
@@ -65,7 +65,7 @@ RakshaLink is built for that moment: one tap, one spoken sentence, or **no tap a
 | **Drive Mode crash response** | The foreground sensor prototype requires speed context, impact, and a sudden stop, then starts a **20-second alarm countdown** with a cancel button. Replayed traces are tested; real crash accuracy and physical-device behavior are unverified. |
 | **Responder workflow** | The desktop console supports demo duty state, role views, Accept / Can't respond, and responder-set On the way, Arrived, and Resolved steps. The rider sees only server-reported statuses. |
 | **Escalation** | Timeout or decline moves to the next on-duty match. If nobody accepts, the app says so and shows **Call 112**. |
-| **Offline ladder** | SOS drafts persist locally, the screen flashes Morse, and the rider can retry when connected. A prefilled SMS draft is limited to configured whitelisted team numbers; no team number is configured in this demo. |
+| **Offline ladder** | SOS drafts persist locally, the screen flashes Morse, and the rider can retry when connected. A prefilled SMS draft is limited to configured whitelisted team numbers and must be reviewed and sent manually. |
 
 ### How it compares with a plain SOS button
 
@@ -164,10 +164,11 @@ Calm under stress: big targets, plain words, one dominant action per screen, and
 | T2 | Foreground sensor prototype + replayed crash traces | ◐ |
 | T2 | Family alert | ◐ In-app simulation only; explicitly says no contact was notified |
 | T2 | SOS-to-first-dispatch metric | ✅ |
-| T3 | Voice SOS, language toggle, share, history | ⬜ |
-| T3 | Responder-entered ETA estimate | ◐ In progress; optional estimate is typed by the responder and shown as such |
-| T3 | Responder history | ◐ Resolved and unanswered alerts from the current demo session |
-| T3 | Operations overview | ◐ Current-session alert and on-duty counts, scoped to the selected view |
+| T3 | Voice SOS, language toggle | ⬜ |
+| T3 | Share request update | ✅ Optional OS share sheet; user chooses destination; no location or token included |
+| T3 | Responder-entered ETA estimate | ✅ Optional estimate is typed by the responder and shown as such |
+| T3 | Responder history | ✅ Resolved and unanswered alerts from the current demo session |
+| T3 | Operations overview | ✅ Current-session alert and on-duty counts, scoped to the selected view |
 
 ## Tech stack
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, SafeAreaView, ScrollView, Share, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -17,6 +17,7 @@ const CATEGORIES = [
   { id: 'accident', title: 'Accident', hint: 'Road incident', icon: '⚠', color: '#2B3A67', pale: '#E9ECF4' },
   { id: 'medical', title: 'Medical', hint: 'Medical help', icon: '✚', color: '#5B1F2D', pale: '#F3E9EC' },
 ];
+const SMS_TEAM_MEMBER_LABELS = ['Nitin Agarwal', 'Ashish Chandra Acharjee', 'Pranay Saha'];
 const MORSE_BITS = [1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0];
 const OFFLINE_QUEUE_KEY = 'rakshalink.offline-queue.v1';
 
@@ -53,6 +54,7 @@ export default function App() {
   const [offlineView, setOfflineView] = useState(false);
   const [morseOn, setMorseOn] = useState(false);
   const [smsTargets, setSmsTargets] = useState([]);
+  const [smsTargetIndex, setSmsTargetIndex] = useState(0);
   const [sensorActive, setSensorActive] = useState(false);
   const [sensorMessage, setSensorMessage] = useState('');
   const sensorSamplesRef = useRef([]);
@@ -213,11 +215,21 @@ export default function App() {
   ]);
 
   const openSmsDraft = async () => {
-    const target = smsTargets[0];
+    const target = smsTargets[smsTargetIndex] || smsTargets[0];
     const queued = offlineQueue[0];
     if (!target || !queued) return;
-    const place = queued.body.preset_id ? `preset ${queued.body.preset_id}` : 'device location';
-    const body = `RakshaLink demo SOS: ${queued.category}. ${place}, coordinates ${queued.body.lat}, ${queued.body.lng}. This is a draft; RakshaLink did not send it.`;
+    const presetLabel = PRESETS.find(item => item.id === queued.body.preset_id)?.label;
+    const categoryLabel = CATEGORIES.find(item => item.id === queued.category)?.title || 'SOS';
+    const locationLabel = presetLabel
+      ? `${presetLabel} (SAMPLE · DEMO)`
+      : 'Device location captured when the request was created';
+    const body = [
+      `RakshaLink DEMO request · ${categoryLabel}`,
+      `Location: ${locationLabel}`,
+      `Coordinates: ${queued.body.lat}, ${queued.body.lng}`,
+      'Draft only; RakshaLink has not sent this message or notified a responder.',
+      'This demo is not emergency dispatch. For urgent help, call 112.',
+    ].join('\n');
     try { await Linking.openURL(`sms:${encodeURIComponent(target)}?body=${encodeURIComponent(body)}`); }
     catch { setError('Could not open the SMS app. The request remains in the local queue.'); }
   };
@@ -304,6 +316,32 @@ export default function App() {
     startCrashSimulation({ peak_g: signal.peak_g, pre_impact_kmh: signal.pre_impact_kmh });
   };
 
+  const shareRequestUpdate = async (category, event, unanswered, accepted) => {
+    const currentSteps = event.steps || {};
+    const requestState = unanswered
+      ? 'No responder answered. Call 112.'
+      : currentSteps.resolved
+        ? 'Resolved by the responder.'
+        : currentSteps.arrived
+          ? 'Responder marked arrived.'
+          : currentSteps.enroute
+            ? 'Responder marked on the way.'
+            : accepted
+              ? 'A responder accepted.'
+              : 'Waiting for a responder to accept.';
+    const message = [
+      `RakshaLink demo update: ${category?.title || 'SOS'} request`,
+      `Status: ${requestState}`,
+      'Dispatch is simulated. This app has not notified a family contact.',
+      'Shared only if you choose a destination in the device share sheet.',
+    ].join('\n');
+    try {
+      await Share.share({ title: 'RakshaLink request update', message });
+    } catch {
+      Alert.alert('Share unavailable', 'This device could not open its share options.');
+    }
+  };
+
   const call112 = async () => {
     try {
       await Linking.openURL('tel:112');
@@ -320,17 +358,36 @@ export default function App() {
           <BrandHeader />
           <Text style={styles.offlineEyebrow}>OFFLINE LADDER · DEMO</Text>
           <Text style={styles.offlineTitle}>Request held in offline queue</Text>
-          <Text style={styles.offlineCopy}>Not sent. Retry when connected, or use the available team SMS draft. No responder has accepted. Queue items are stored on this device until retried or removed.</Text>
+          <Text style={styles.offlineCopy}>Not sent. No responder has accepted. Your requests remain on this device until you retry or discard them.</Text>
           <View style={[styles.morseCard, morseOn && styles.morseCardOn]}>
-            <Text style={[styles.morseSignal, morseOn && styles.morseSignalOn]}>{morseOn ? 'SOS' : '··· ——— ···'}</Text>
-            <Text style={[styles.morseCaption, morseOn && styles.morseSignalOn]}>Screen Morse flash only · does not contact responders</Text>
+            <Text accessibilityLabel="Repeating visual SOS Morse signal" style={[styles.morseSignal, morseOn && styles.morseSignalOn]}>{morseOn ? 'SOS' : '··· ——— ···'}</Text>
+            <Text style={[styles.morseCaption, morseOn && styles.morseSignalOn]}>Show this screen to someone nearby. Visual pattern only; it sends nothing and does not notify responders.</Text>
           </View>
           <Text style={styles.queueLabel}>Offline queue · {offlineQueue.length} {offlineQueue.length === 1 ? 'request' : 'requests'}</Text>
-          {offlineQueue.map((item, index) => <Text key={item.id} style={styles.queueItem}>{index + 1}. {CATEGORIES.find(category => category.id === item.category)?.title || 'SOS'} · {item.body.preset_id || 'device location'}</Text>)}
+          {offlineQueue.map((item, index) => {
+            const categoryLabel = CATEGORIES.find(category => category.id === item.category)?.title || 'SOS';
+            const locationLabel = PRESETS.find(sample => sample.id === item.body.preset_id)?.label || 'device location';
+            return <Text key={item.id} style={styles.queueItem}>{index + 1}. {categoryLabel} · {locationLabel}</Text>;
+          })}
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
           <ActionButton title={loading ? 'Retrying…' : 'Retry queued request'} onPress={retryQueued} disabled={loading} style={styles.retryButton} />
-          <ActionButton title={smsTargets.length ? 'Open prefilled team SMS draft' : 'Team SMS unavailable — no whitelist configured'} onPress={openSmsDraft} disabled={!smsTargets.length} style={styles.smsButton} />
-          <Text style={styles.smsNote}>{smsTargets.length ? 'The draft is addressed only to a DEMO_MODE whitelisted team number. Review it; nothing is sent automatically.' : 'No approved team SMS destination was provided by the demo server.'}</Text>
+          {smsTargets.length ? (
+            <View style={styles.smsRecipientGroup}>
+              <Text style={styles.smsRecipientHeading}>Approved demo team recipient</Text>
+              {smsTargets.map((target, index) => {
+                const selected = index === smsTargetIndex;
+                const memberName = SMS_TEAM_MEMBER_LABELS[index] || `Team member ${index + 1}`;
+                return (
+                  <Pressable key={`${target}-${index}`} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setSmsTargetIndex(index)} style={[styles.smsRecipient, selected && styles.smsRecipientSelected]}>
+                    <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioInner} /> : null}</View>
+                    <Text style={styles.smsRecipientText}>{memberName} · ••••{target.slice(-4)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+          <ActionButton title={smsTargets.length ? 'Open SMS draft · first queued request' : 'Team SMS unavailable — no whitelist configured'} onPress={openSmsDraft} disabled={!smsTargets.length} style={styles.smsButton} />
+          <Text style={styles.smsNote}>{smsTargets.length ? 'Opens a draft to the selected approved team member for the first queued request only. Review the recipient and text, then tap Send yourself; RakshaLink never sends it automatically.' : 'The demo server has no approved team SMS destination, so this fallback is unavailable.'}</Text>
           <ActionButton title="Discard offline requests" onPress={discardQueued} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
           <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
           <ActionButton title="Back to home" onPress={() => setOfflineView(false)} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
@@ -408,6 +465,8 @@ export default function App() {
               {done ? <Text style={styles.doneLabel}>DONE</Text> : null}
             </View>
           ))}
+          <Text style={styles.shareHint}>Opens your device share options. Nothing is shared until you choose a destination.</Text>
+          <ActionButton title="Share request update" onPress={() => shareRequestUpdate(category, event, unanswered, accepted)} style={styles.shareButton} textStyle={styles.shareButtonText} />
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
           <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
           <ActionButton title="Back to home" onPress={() => { setActive(null); setStatus(null); setError(''); }} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
@@ -538,6 +597,9 @@ const styles = StyleSheet.create({
   callButton: { backgroundColor: '#BA1A1A', marginTop: 4 },
   secondaryButton: { backgroundColor: '#E8EEE9', marginTop: 20 },
   secondaryButtonText: { color: '#26372E' },
+  shareButton: { backgroundColor: '#E8EEE9', marginTop: 16 },
+  shareButtonText: { color: '#26372E' },
+  shareHint: { color: '#758078', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 12 },
   pressed: { opacity: 0.78 },
   disabled: { opacity: 0.52 },
   loading: { color: '#43544A', marginTop: 12, fontSize: 14, textAlign: 'center' },
@@ -565,6 +627,11 @@ const styles = StyleSheet.create({
   queueLabel: { color: '#F4D895', fontSize: 14, fontWeight: '800', marginBottom: 7 },
   queueItem: { color: '#FFFFFF', fontSize: 13, paddingVertical: 5 },
   retryButton: { backgroundColor: '#245740', marginTop: 12 },
+  smsRecipientGroup: { marginTop: 12, padding: 12, backgroundColor: '#202923', borderRadius: 12 },
+  smsRecipientHeading: { color: '#E0E8DF', fontSize: 12, fontWeight: '800', marginBottom: 5 },
+  smsRecipient: { minHeight: 42, flexDirection: 'row', alignItems: 'center', borderRadius: 9, paddingHorizontal: 8, borderWidth: 1, borderColor: 'transparent' },
+  smsRecipientSelected: { backgroundColor: '#293A30', borderColor: '#658A6D' },
+  smsRecipientText: { color: '#F5F7F4', fontSize: 12, fontWeight: '700' },
   smsButton: { backgroundColor: '#3D2A5C', marginTop: 10 },
   smsNote: { color: '#C7D0C9', fontSize: 10, lineHeight: 15, textAlign: 'center', marginTop: 7, marginBottom: 11 },
 });

@@ -12,7 +12,9 @@ The app offers the two API presets, four SOS categories, a live status poll, and
 
 The supplied RakshaLink logo appears in the home, status, offline, and crash-countdown headers. The crash countdown is presented as a dedicated visual screen; its timer, cancel action, and mock Accident SOS behavior remain unchanged. No immediate-send action is shown.
 
-If SOS submission fails because the network is unreachable, the request is stored in local AsyncStorage. The offline screen shows a repeating screen-based Morse SOS pattern and retries the queued request. If the demo API provides a whitelisted team number, the app can open a prefilled SMS draft to that number; it never sends the SMS. No destination is configured in the current demo environment, so that action is unavailable. The Morse screen does not contact responders. Call 112 remains manual.
+The status screen has an optional **Share request update** action. It opens the operating system share sheet with the request category and current responder-reported state; it contains no location or responder token. The user must choose a destination before anything is shared. It does not contact responders or family on its own.
+
+If SOS submission fails because the network is unreachable, the request is stored in local AsyncStorage. The offline screen shows a repeating, screen-only Morse SOS pattern for a nearby person to see; it does not contact responders. Retry sends the oldest queued request to the demo API. If the API provides whitelisted team numbers, the user selects a recipient and can open a prefilled SMS draft for the oldest queued request. The draft labels sample/demo locations and says it has not been sent. The user reviews it and sends it manually. The button is disabled when the server has no approved destinations. Call 112 remains manual.
 
 ## Verification
 
