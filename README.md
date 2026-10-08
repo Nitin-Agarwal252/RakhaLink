@@ -162,7 +162,7 @@ Calm under stress: big targets, plain words, one dominant action per screen, and
 | T2 | Sequential timeout/decline escalation | ✅ |
 | T2 | Offline queue + screen Morse + whitelisted SMS draft fallback | ◐ |
 | T2 | Foreground sensor prototype + replayed crash traces | ◐ |
-| T2 | Family alert | Deferred: no permitted family destination under current outbound-contact rule |
+| T2 | Family alert | ◐ In-app simulation only; explicitly says no contact was notified |
 | T2 | SOS-to-first-dispatch metric | ✅ |
 | T3 | Voice SOS, language toggle, share, history | ⬜ |
 | T3 | Responder history, operations overview | ⬜ |

@@ -27,6 +27,7 @@
 - Offline SOS drafts persist in AsyncStorage. The offline screen has a repeating screen Morse signal, retry, discard, manual Call 112, and prefilled SMS draft to a DEMO_MODE whitelist destination only. No team whitelist exists in this environment, so the SMS draft action is disabled.
 - Foreground crash-monitoring prototype reads location speed and accelerometer data; it requires a recent speed context, an impact, and a sudden speed drop before a 20-second countdown. Sample trace replay rejects an isolated spike. No accuracy claim or background monitoring.
 - Console displays a median SOS-to-first-dispatch metric based on successful dispatches in the current in-memory demo session.
+- SOS status and console now show an in-memory `SIMULATED FAMILY ALERT` record with `sent: false`, no destination, and the explicit message that no contact was notified. No family contact is collected, stored, or messaged.
 
 ### Verification
 - `npm test`: 5 passed, 0 failed; server and console JavaScript syntax checks passed.
@@ -34,9 +35,10 @@
 - Expo offline dependency check passed using the bundled SDK map; Android export passed with 621 modules, a 1.6 MB bundle, and 44 KB alarm asset. Expo used the local SDK version map because the registry was unreachable.
 - Loopback mock API: timeout advanced after the configured 3 seconds; decline advanced when another hospital match existed; off-duty match was excluded and restored afterward; hospital role filter returned no non-hospital matches.
 - Direct localhost SSE probe confirmed the hospital role receives its duty-change event. `git diff --check` passed; the sample responder file was restored after the probe.
+- Family-alert API verification: new SOS, rider status, and console events each return the same simulated-only record (`sent: false`, `destination: null`); a contact payload receives HTTP 400. Android export reran successfully with the family-alert UI (621 modules, 1.6 MB bundle, 44 KB alarm asset).
 - Browser console: four-role selector showed only relevant events; duty toggle changed count and restored it; accepted alert progressed through all three responder states. `GET /api/sos/:id` showed accepted/enroute/arrived/resolved flags true.
 - Physical handset verification remains pending for Expo permission prompts, live sensor stream, sound, dialer, queue restoration after process restart, and SMS composer. No real SMS/call occurred.
 
 ### Gate status and remaining boundary
-- T2 core flows are implemented and mock-verified. A family alert is intentionally not implemented because the project rule allows outbound SMS/calls only to whitelisted team numbers; no safe family recipient channel is configured. Do not describe T2 as fully complete until that scope is resolved and a physical-device rehearsal is performed.
+- T2 demo flows are implemented and mock-verified. The family-alert UI is a simulation only; real family notification is unavailable under the project rule that outbound SMS/calls go only to whitelisted team numbers. Physical-device rehearsal is still pending.
 - No real crash-sensor accuracy or response-time claim is made. Automatic escalation and metrics are in-memory demo behavior and reset when the server restarts.

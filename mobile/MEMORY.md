@@ -30,3 +30,4 @@ Mobile G1 is complete. T1 mock integration is complete; a physical end-to-end ru
 - Added an opt-in, foreground-only sensor prototype using location speed and accelerometer input; all three conditions (speed context, impact, sudden stop) must match before the 20-second countdown starts. No background monitoring or accuracy claim.
 - Replayed traces verify complete sequence detection, isolated spike rejection, and missing speed-context rejection (3 tests passed). Expo Android bundle includes the new sensor/location/storage modules.
 - Physical device permission prompts, sensor readings, alarm, dialer, offline persistence, and SMS composer remain unverified on a handset.
+- Rider status shows the API-provided simulated family-alert state and states no contact was notified; no family destination is collected or messaged.

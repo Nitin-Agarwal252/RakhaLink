@@ -14,17 +14,18 @@ All bodies are JSON. Times are ISO 8601. IDs are strings. Sample values only.
 { "category": "accident", "trigger": "crash_auto", "lat": 22.6951, "lng": 88.3788,
   "client_id": "c0ffee-1", "client_ts": "2026-10-08T10:42:00+05:30",
   "peak_g": 8.4, "pre_impact_kmh": 72,
-  "transcript": null, "contacts": [{ "phone": "+910000000000" }] }
+  "transcript": null }
 ```
-`peak_g`, `pre_impact_kmh` only for `crash_auto`. `transcript` only for `voice`. `contacts` optional, max 2, not stored.
+`peak_g`, `pre_impact_kmh` only for `crash_auto`. `transcript` only for `voice`. Contact payloads are rejected and never stored.
 Response `201`:
 ```json
 { "id": "e1", "status": "dispatched",
+  "family_alert": { "status": "simulated", "label": "SIMULATED FAMILY ALERT", "destination": null, "sent": false, "detail": "Demo record only. No contact was notified." },
   "matches": [ { "responder_id": 12, "name": "Sample District Hospital", "type": "hospital", "distance_m": 4200, "is_demo": true },
                { "responder_id": 31, "name": "Sample Highway Police Station", "type": "police", "distance_m": 3800, "is_demo": true } ],
   "dispatch": [ { "responder_id": 12, "method": "sms", "simulated": true } ] }
 ```
-Errors: `400 {"error":"invalid_category"}`, `400 {"error":"invalid_location"}`, `429 {"error":"rate_limited"}`.
+Errors: `400 {"error":"invalid_category"}`, `400 {"error":"invalid_location"}`, `400 {"error":"contacts_not_supported_in_demo"}`, `429 {"error":"rate_limited"}`. Contact payloads are rejected and never stored.
 
 ## `GET /api/sos/:id` (rider status screen)
 ```json
@@ -34,6 +35,7 @@ Errors: `400 {"error":"invalid_category"}`, `400 {"error":"invalid_location"}`, 
   "responders": [ { "name": "Sample District Hospital", "type": "hospital", "distance_m": 4200 } ] }
 ```
 `responder_eta_minutes` is non-null only if the responder typed it. The app never shows an ETA the system computed.
+`family_alert` is a local in-memory demo record, never an outbound notification. The mobile status screen and responder console label it simulated and state that no contact was notified. No contact data is accepted or stored.
 
 ## Responder actions (same token as the SMS link; the console uses the same calls)
 - `GET /r/:token` mobile accept page (HTML)

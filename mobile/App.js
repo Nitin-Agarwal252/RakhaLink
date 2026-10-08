@@ -355,6 +355,7 @@ export default function App() {
             {!accepted && !unanswered ? <Text style={styles.bodyText}>Help is not confirmed until a responder accepts.</Text> : null}
             {accepted && event.responders?.[0] ? <Text style={styles.bodyText}>{event.responders[0].name} · {event.responders[0].type.replace('_', ' ')}</Text> : null}
             {accepted && Number.isFinite(event.responder_eta_minutes) ? <Text style={styles.bodyText}>Responder estimate: {event.responder_eta_minutes} min</Text> : null}
+            {event.family_alert?.status === 'simulated' ? <Text style={styles.familyAlert}>SIMULATED FAMILY ALERT · No contact was notified.</Text> : null}
           </View>
           <Text style={styles.sectionTitle}>Request timeline</Text>
           {timeline.map(([label, done], index) => (
@@ -494,6 +495,7 @@ const styles = StyleSheet.create({
   footer: { color: '#758078', fontSize: 10, lineHeight: 15, textAlign: 'center', marginTop: 10 },
   statusCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCE5DE', borderRadius: 18, padding: 18, marginTop: 20, marginBottom: 20 },
   statusHeading: { color: '#21352A', fontSize: 19, lineHeight: 26, fontWeight: '800' },
+  familyAlert: { marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: '#FFF5DC', color: '#725B24', fontSize: 12, lineHeight: 18, fontWeight: '700' },
   timelineRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', borderBottomColor: '#E7EBE8', borderBottomWidth: 1 },
   timelineDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#AAB4AD', marginRight: 12 },
   timelineDotDone: { backgroundColor: '#267348', borderColor: '#267348' },

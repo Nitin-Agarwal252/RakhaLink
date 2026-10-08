@@ -180,6 +180,10 @@ function renderDetails(item) {
   document.querySelector('#created').textContent = formatDate(item.created_at);
   document.querySelector('#dispatch-label').textContent = item.dispatch_label || 'SIMULATED DISPATCH';
   document.querySelector('#dispatch-label').classList.toggle('real', item.dispatch_label && !item.dispatch_label.includes('SIMULATED'));
+  const familyAlert = document.querySelector('#family-alert');
+  familyAlert.hidden = item.family_alert?.status !== 'simulated';
+  familyAlert.querySelector('strong').textContent = item.family_alert?.label || 'SIMULATED FAMILY ALERT';
+  familyAlert.querySelector('span').textContent = item.family_alert?.detail || 'Demo record only. No contact was notified.';
   pill.textContent = readable(item.status || 'received');
   pill.className = `status-pill ${String(item.status || '').toLowerCase()}`;
   renderCountdown(item);

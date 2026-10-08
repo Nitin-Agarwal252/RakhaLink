@@ -38,6 +38,11 @@
 - Metric now records actual SOS-to-first-successful-dispatch duration for the in-memory demo session. No performance claim is made from the smoke run.
 - No team whitelist is configured, so only mock dispatch was exercised. Family notification is not implemented: there is no approved family channel, and outbound contact is restricted to whitelisted team destinations.
 
+## Family-alert demo slice — 8 Oct 2026
+- Every SOS response carries a local-only `family_alert` demo record. API and console/mobile UI say `SIMULATED FAMILY ALERT` and “No contact was notified.” No destination is accepted or stored; nothing is sent.
+- Local mock HTTP verification confirmed the field on create/status/events and HTTP 400 for a supplied contact payload.
+- Real family messaging remains unavailable under the outbound-contact rule and requires a separately approved contact policy before implementation.
+
 ## Overall T1 integration — 8 Oct 2026
 - Static desktop console and tokenized responder accept page are served by Express; both use API data, explicit demo dispatch labeling, and OpenStreetMap attribution.
 - Browser/API verification covered acceptance, event status propagation, all-declined → unanswered, and the required “No responder answered. Call 112.” message.

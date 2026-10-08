@@ -108,7 +108,7 @@ app.post('/api/sos', async (req, res) => {
   if (!['manual', 'voice', 'crash_auto'].includes(body.trigger || 'manual')) return res.status(400).json({ error: 'invalid_trigger' });
   if (body.trigger === 'crash_auto' && (!Number.isFinite(body.peak_g) || body.peak_g < 0 || !Number.isFinite(body.pre_impact_kmh) || body.pre_impact_kmh < 0)) return res.status(400).json({ error: 'invalid_crash_summary' });
   if (body.trigger === 'voice' && body.transcript != null && typeof body.transcript !== 'string') return res.status(400).json({ error: 'invalid_transcript' });
-  if (body.contacts != null && (!Array.isArray(body.contacts) || body.contacts.length > 2 || body.contacts.some(c => typeof c?.phone !== 'string'))) return res.status(400).json({ error: 'invalid_contacts' });
+  if (body.contacts != null) return res.status(400).json({ error: 'contacts_not_supported_in_demo' });
 
   const selectedPreset = body.preset_id
     ? presets.find(preset => preset.id === body.preset_id)
@@ -118,6 +118,7 @@ app.post('/api/sos', async (req, res) => {
   const event = {
     id: crypto.randomUUID(), category: body.category, trigger: body.trigger || 'manual', client_id: body.client_id || null,
     created_at: new Date().toISOString(), created_ms: now, status: 'received', matches: [], responders: [],
+    family_alert: { status: 'simulated', label: 'SIMULATED FAMILY ALERT', destination: null, sent: false, detail: 'Demo record only. No contact was notified.' },
     lat: body.lat, lng: body.lng, preset_id: preset?.id || null, preset_label: preset?.label || null,
     response_window_s: config.escalateAfterS,
     peak_g: body.trigger === 'crash_auto' ? body.peak_g : undefined,
@@ -139,7 +140,7 @@ app.post('/api/sos', async (req, res) => {
   event.nextMatchIndex = 0;
   events.set(event.id, event);
   await dispatchNext(event);
-  return res.status(201).json({ id: event.id, status: event.status, matches: event.matches.map(({ lat, lng, ...row }) => row), dispatch: event.dispatch });
+  return res.status(201).json({ id: event.id, status: event.status, family_alert: event.family_alert, matches: event.matches.map(({ lat, lng, ...row }) => row), dispatch: event.dispatch });
 });
 
 app.get('/api/sos/:id', (req, res) => {
@@ -150,6 +151,7 @@ app.get('/api/sos/:id', (req, res) => {
   const primary = event.responders[0];
   return res.json({
     id: event.id, category: event.category, trigger: event.trigger, status: event.status,
+    family_alert: event.family_alert,
     steps: flags(event, accepted || primary), responder_eta_minutes: accepted?.responder_eta_minutes ?? null,
     responders: responderMatch ? [{ name: responderMatch.name, type: responderMatch.type, distance_m: responderMatch.distance_m }] : []
   });
@@ -163,6 +165,7 @@ app.get('/api/events', (req, res) => {
   );
   res.json(result.map(event => ({
     id: event.id, category: event.category, trigger: event.trigger, status: event.status,
+    family_alert: event.family_alert,
     created_at: event.created_at, lat: event.lat, lng: event.lng, preset_id: event.preset_id, preset_label: event.preset_label,
     response_window_s: event.response_window_s,
     dispatch_label: event.dispatch?.some(row => row.simulated) ? 'SIMULATED DISPATCH' : event.dispatch?.some(row => row.ok) ? 'TEAM WHITELIST DISPATCH' : 'NO DISPATCH',
