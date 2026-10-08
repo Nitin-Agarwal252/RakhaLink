@@ -37,14 +37,16 @@ Errors: `400 {"error":"invalid_category"}`, `400 {"error":"invalid_location"}`, 
 
 ## Responder actions (same token as the SMS link; the console uses the same calls)
 - `GET /r/:token` mobile accept page (HTML)
+- `GET /r/:token/info` private alert and responder details for the accept page; returns no phone number
 - `POST /r/:token/accept` returns `{ "ok": true, "status": "accepted" }`
-- `POST /r/:token/decline` returns `{ "ok": true }` and triggers escalation
+- `POST /r/:token/decline` returns `{ "ok": true }`; if all notified matches decline, the SOS status becomes `unanswered`. T1 does not auto-escalate.
 - `POST /r/:token/status` body `{ "step": "enroute" | "arrived" | "resolved", "eta_minutes": 8 }` (`eta_minutes` optional). Steps must go in order.
 - `POST /api/responders/:id/duty` body `{ "on_duty": false }`
 
 ## Console data
-- `GET /api/events?responder_id=12` returns alerts for that responder, filtered by role.
+- `GET /api/events?responder_id=12` returns alerts for that responder, filtered by role. T1 event rows include `response_window_s`, `dispatch_label`, and responder match `status`, `simulated`, and `accept_url` fields for the console. Matched locations are sample/demo OSM points; distances are straight-line.
 - `GET /api/stream?responder_id=12` (Server-Sent Events). Event names: `alert`, `status`, `escalated`, `unanswered`. Each `data:` is JSON such as `{ "id": "e1", "status": "accepted" }`.
+- The T1 console displays the configured response window as a countdown. Its expiry does not send another dispatch; automatic escalation is a separate T2 feature.
 
 ## Other
 - `POST /api/sms/inbound` compact payload `RL1|<M|A|B|F>|<lat>,<lng>|<unix_ts>` (add `|C` for crash)

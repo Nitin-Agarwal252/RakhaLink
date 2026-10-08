@@ -1,6 +1,6 @@
 # RakshaLink mobile
 
-Expo Go compatible rider app for the T1 home, SOS, and status flow. It uses React Native core components and `fetch`; it adds no custom native modules.
+Expo Go compatible rider app for the T1 home, SOS/status, and simulated crash countdown. It uses React Native core components, `fetch`, and Expo Audio (included in Expo Go); no custom native modules are added.
 
 ## Run
 
@@ -8,7 +8,7 @@ Expo Go compatible rider app for the T1 home, SOS, and status flow. It uses Reac
 2. Copy `.env.example` to `.env.local`. On a physical phone, set `EXPO_PUBLIC_API_BASE_URL` to the laptop's reachable LAN address, for example `http://192.168.1.20:3000`. `localhost` is suitable for a simulator on the same computer.
 3. Run `npm install` and `npx expo start`; open the QR code in Expo Go.
 
-The app offers the two API presets, four SOS categories, a live status poll, and a manual Call 112 button that opens the dialer only after a tap. Demo dispatch is labelled. The responder locations are demo data; the attribution shown is © OpenStreetMap contributors. Drive Mode crash simulation is clearly marked as coming soon until its next build phase.
+The app offers the two API presets, four SOS categories, a live status poll, and a manual Call 112 button that opens the dialer only after a tap. Drive Mode's **Simulate crash** starts a 20-second alarm/countdown with a large “I'm OK” cancel action; if it reaches zero, the app posts a demo `crash_auto` accident SOS. It does not read device motion sensors. Demo dispatch and the contract's example crash summary values are clearly labelled as demo data.
 
 ## Verification
 

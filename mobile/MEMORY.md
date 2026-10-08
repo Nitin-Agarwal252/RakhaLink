@@ -18,3 +18,9 @@
 ### Gate status
 
 Mobile G1 home and bundle check pass. Overall T1/G2 remains pending the desktop console and a physical end-to-end run. Drive Mode simulation/countdown remains for the next mobile slice.
+
+## Overall T1 gate — 8 Oct 2026
+- T1 mobile flow now includes Drive Mode crash simulation, a 20-second audible countdown, cancel, and automatic demo Accident SOS. Sensor-based crash detection is not implemented.
+- Added desktop responder console and tokenized accept page integration; mock browser/API checks confirmed accepted and all-declined/unanswered paths.
+- Verification: Android Expo bundle passed after audio dependency/assets were added; server triage tests passed (5/5). Physical-device rendering/audio, dialer launch, and phone-to-laptop rehearsal remain unverified.
+- T1 code is complete for mock dispatch. Automatic escalation remains Tier 2; no real SMS or call was sent.

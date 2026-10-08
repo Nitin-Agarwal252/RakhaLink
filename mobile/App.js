@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
 const PRESETS = [
@@ -7,10 +8,10 @@ const PRESETS = [
   { id: 'nh19-durgapur', label: 'NH-19 sample point (Durgapur area)', lat: 23.55, lng: 87.32, sample: true },
 ];
 const CATEGORIES = [
-  { id: 'fuel', title: 'Fuel', hint: 'Need fuel', icon: '⛽', color: '#267348', pale: '#EAF5EE' },
-  { id: 'breakdown', title: 'Breakdown', hint: 'Vehicle trouble', icon: '🛠', color: '#087E80', pale: '#E8F5F4' },
-  { id: 'accident', title: 'Accident', hint: 'Road incident', icon: '⚠', color: '#19385D', pale: '#EBF0F6' },
-  { id: 'medical', title: 'Medical', hint: 'Medical help', icon: '✚', color: '#8A2845', pale: '#F7EBEF' },
+  { id: 'fuel', title: 'Fuel', hint: 'Need fuel', icon: '⛽', color: '#274706', pale: '#EDF2E6' },
+  { id: 'breakdown', title: 'Breakdown', hint: 'Vehicle trouble', icon: '🛠', color: '#1B4D4F', pale: '#E6F0F0' },
+  { id: 'accident', title: 'Accident', hint: 'Road incident', icon: '⚠', color: '#2B3A67', pale: '#E9ECF4' },
+  { id: 'medical', title: 'Medical', hint: 'Medical help', icon: '✚', color: '#5B1F2D', pale: '#F3E9EC' },
 ];
 
 function ActionButton({ title, onPress, disabled, style, textStyle }) {
@@ -22,11 +23,15 @@ function ActionButton({ title, onPress, disabled, style, textStyle }) {
 }
 
 export default function App() {
+  const alarmPlayer = useAudioPlayer(require('./assets/countdown-alarm.wav'));
   const [preset, setPreset] = useState(PRESETS[0]);
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState(null);
+  const [crashDeadline, setCrashDeadline] = useState(null);
+  const [countdownSeconds, setCountdownSeconds] = useState(null);
+  const [crashNotice, setCrashNotice] = useState('');
 
   useEffect(() => {
     if (!active) return undefined;
@@ -48,14 +53,27 @@ export default function App() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [active]);
 
-  const createSos = async (category) => {
+  const stopAlarm = () => {
+    alarmPlayer.pause();
+    alarmPlayer.seekTo(0).catch(() => {});
+  };
+
+  const createSos = async (category, trigger = 'manual', crashSummary = null) => {
+    if (trigger !== 'crash_auto' && crashDeadline) {
+      setCrashDeadline(null);
+      setCountdownSeconds(null);
+      stopAlarm();
+      setCrashNotice('Crash simulation cancelled.');
+    }
     setLoading(true);
     setError('');
     try {
+      const body = { category, trigger, lat: preset.lat, lng: preset.lng, preset_id: preset.id };
+      if (crashSummary) Object.assign(body, crashSummary);
       const response = await fetch(`${API_BASE}/api/sos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, trigger: 'manual', lat: preset.lat, lng: preset.lng, preset_id: preset.id }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not send SOS.');
@@ -67,6 +85,45 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const startCrashSimulation = async () => {
+    setError('');
+    setCrashNotice('');
+    try {
+      await setAudioModeAsync({ playsInSilentMode: true });
+      alarmPlayer.loop = 'single';
+      alarmPlayer.volume = 0.9;
+      alarmPlayer.play();
+    } catch {
+      setCrashNotice('The alarm could not start on this device. The countdown will continue on screen.');
+    }
+    setCountdownSeconds(20);
+    setCrashDeadline(Date.now() + 20000);
+  };
+
+  const cancelCrashSimulation = () => {
+    setCrashDeadline(null);
+    setCountdownSeconds(null);
+    stopAlarm();
+    setCrashNotice('Crash simulation cancelled. No SOS was sent.');
+  };
+
+  useEffect(() => {
+    if (!crashDeadline) return undefined;
+    const tick = () => {
+      const next = Math.max(0, Math.ceil((crashDeadline - Date.now()) / 1000));
+      setCountdownSeconds(next);
+      if (next === 0) {
+        setCrashDeadline(null);
+        stopAlarm();
+        setCrashNotice('Simulation complete. Sending a demo accident alert.');
+        createSos('accident', 'crash_auto', { peak_g: 8.4, pre_impact_kmh: 72 });
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 200);
+    return () => clearInterval(interval);
+  }, [crashDeadline]);
 
   const call112 = async () => {
     try {
@@ -112,7 +169,7 @@ export default function App() {
             </View>
           ))}
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-          {unanswered ? <ActionButton title="Call 112" onPress={call112} style={styles.callButton} /> : null}
+          <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
           <ActionButton title="Back to home" onPress={() => { setActive(null); setStatus(null); setError(''); }} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
         </ScrollView>
       </SafeAreaView>
@@ -161,11 +218,23 @@ export default function App() {
         {loading ? <Text style={styles.loading}>Sending demo request…</Text> : null}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
 
-        <View style={styles.driveCard}>
-          <Text style={styles.driveEyebrow}>DRIVE MODE</Text>
-          <Text style={styles.driveTitle}>Crash alert simulation</Text>
-          <Text style={styles.bodyText}>The countdown and simulated crash request will be available in the next build phase.</Text>
-        </View>
+        {crashDeadline ? (
+          <View style={styles.crashCard} accessibilityLiveRegion="assertive">
+            <Text style={styles.crashEyebrow}>SIMULATE CRASH · DEMO DATA</Text>
+            <Text style={styles.crashTitle}>Are you okay?</Text>
+            <Text style={styles.countdownNumber}>{String(countdownSeconds ?? 20)}</Text>
+            <Text style={styles.bodyText}>Alarm sounding. A demo accident SOS sends automatically when the countdown ends.</Text>
+            <ActionButton title="I’m OK — cancel alert" onPress={cancelCrashSimulation} style={styles.okButton} />
+          </View>
+        ) : (
+          <View style={styles.driveCard}>
+            <Text style={styles.driveEyebrow}>DRIVE MODE</Text>
+            <Text style={styles.driveTitle}>Crash alert simulation</Text>
+            <Text style={styles.bodyText}>Start a 20-second demo countdown with an alarm. An accident SOS sends automatically unless you cancel.</Text>
+            <ActionButton title="Simulate crash" onPress={startCrashSimulation} style={styles.simulateButton} />
+          </View>
+        )}
+        {crashNotice ? <Text style={styles.crashNotice}>{crashNotice}</Text> : null}
         <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
         <Text style={styles.footer}>DEMO MODE · Dispatch is simulated. Call 112 opens the phone dialer only when tapped.</Text>
       </ScrollView>
@@ -201,10 +270,17 @@ const styles = StyleSheet.create({
   driveCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8E3', borderRadius: 18, padding: 16, marginTop: 17, marginBottom: 14 },
   driveEyebrow: { color: '#66746C', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   driveTitle: { color: '#23342B', fontSize: 17, fontWeight: '800', marginTop: 5, marginBottom: 5 },
+  simulateButton: { backgroundColor: '#19385D', marginTop: 13 },
+  crashCard: { alignItems: 'center', backgroundColor: '#FFF8EE', borderWidth: 2, borderColor: '#C93636', borderRadius: 18, padding: 18, marginTop: 17, marginBottom: 14 },
+  crashEyebrow: { color: '#9B3030', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  crashTitle: { color: '#4A2525', fontSize: 23, fontWeight: '900', marginTop: 9 },
+  countdownNumber: { color: '#A52424', fontSize: 64, fontWeight: '900', lineHeight: 76, fontVariant: ['tabular-nums'] },
+  okButton: { width: '100%', minHeight: 66, backgroundColor: '#267348', marginTop: 16 },
+  crashNotice: { color: '#66746C', textAlign: 'center', fontSize: 12, marginBottom: 8 },
   bodyText: { color: '#657169', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  button: { alignItems: 'center', justifyContent: 'center', borderRadius: 15, minHeight: 54, paddingHorizontal: 18 },
+  button: { alignItems: 'center', justifyContent: 'center', borderRadius: 15, minHeight: 56, paddingHorizontal: 18 },
   buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  callButton: { backgroundColor: '#C93636', marginTop: 4 },
+  callButton: { backgroundColor: '#BA1A1A', marginTop: 4 },
   secondaryButton: { backgroundColor: '#E8EEE9', marginTop: 20 },
   secondaryButtonText: { color: '#26372E' },
   pressed: { opacity: 0.78 },

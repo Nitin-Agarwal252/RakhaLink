@@ -5,7 +5,7 @@
 ### Done
 - Added the demo preset `NH-19 sample point (Durgapur area)` at `23.5500, 87.3200`, marked `is_sample: true` and `is_demo: true`.
 - Seed queries cover OSM `amenity=hospital`, `amenity=police`, `amenity=fuel`, and `shop=car_repair` within 15 km. A type with zero results is queried again at 30 km; the selected radius and count are stored per preset and per type.
-- Both preset results are cached in `data/osm-cache.json`; active responders are written to `data/responders.json`. No Stitch coordinate or `KM 128` text is present in `/server`.
+- Both preset results are cached in `data/osm-cache.json`; active responders are written to `data/responders.json`. No prohibited Stitch values or labels are present in the server implementation.
 - Matching infers a known preset from a location within 30 km of its anchor when `preset_id` is omitted. The mock responder page includes the exact OSM attribution `© OpenStreetMap contributors`.
 
 ### Verification (real output)
@@ -30,3 +30,8 @@
 - Data: Docker is unavailable in this environment; nearest matching uses the in-memory haversine interface.
 - Triage/API: deterministic category rules and four category POST smoke checks passed.
 - Dispatch/status: mock dispatch, hashed random accept tokens, accept/decline/status endpoints, real step flags, events, SSE, metrics, and demo-only reset are implemented. A complete responder status flow was smoke-checked; ETA was retained only after responder entry.
+
+## Overall T1 integration — 8 Oct 2026
+- Static desktop console and tokenized responder accept page are served by Express; both use API data, explicit demo dispatch labeling, and OpenStreetMap attribution.
+- Browser/API verification covered acceptance, event status propagation, all-declined → unanswered, and the required “No responder answered. Call 112.” message.
+- Current limitation: no team whitelist, so only mock dispatch was exercised. Physical mobile-to-console rehearsal remains pending. Automatic escalation is Tier 2.

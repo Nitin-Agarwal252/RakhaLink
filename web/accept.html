@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#153b2b" />
+    <title>RakshaLink responder alert</title>
+    <link rel="stylesheet" href="/accept.css" />
+  </head>
+  <body class="accept-page">
+    <header class="accept-header"><span class="accept-mark">R</span><span>RakshaLink<small>RESPONDER ALERT</small></span><span class="demo-tag">DEMO</span></header>
+    <main class="accept-wrap">
+      <div id="loading" class="accept-card"><p class="eyebrow">ALERT DETAILS</p><h1>Loading alert…</h1><p class="copy">Checking this private responder link.</p></div>
+      <section id="alert" class="accept-card" hidden>
+        <p class="eyebrow">RESPONDER ALERT</p>
+        <div class="alert-title-row"><span id="category-mark" class="category-mark">!</span><div><h1 id="category">Alert</h1><p id="reference" class="reference">—</p></div></div>
+        <div id="dispatch-label" class="dispatch-label">SIMULATED DISPATCH · DEMO MODE</div>
+        <div class="info-list"><div><span>Location</span><strong id="location">—</strong></div><div><span>Your responder unit</span><strong id="responder">—</strong></div><div><span>Alert status</span><strong id="status">—</strong></div><div><span>Distance</span><strong id="distance">—</strong></div></div>
+        <div id="result" class="result" role="status" aria-live="polite" hidden></div>
+        <div id="actions" class="actions"><button id="accept" class="accept-button" type="button">Accept alert</button><button id="decline" class="decline-button" type="button">Can't respond</button></div>
+        <p class="honesty">Only accept if you can respond. This demo does not share a rider phone number.</p>
+      </section>
+      <p class="osm">© OpenStreetMap contributors</p>
+      <p class="safe-note">This page is a demo responder link. Dispatch actions are recorded in the demo API.</p>
+    </main>
+    <script src="/accept.js" defer></script>
+  </body>
+</html>

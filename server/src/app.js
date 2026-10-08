@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 const config = require('./config');
@@ -13,6 +14,7 @@ const listeners = new Set();
 const requests = new Map();
 app.use(cors());
 app.use(express.json({ limit: '32kb' }));
+app.use(express.static(path.resolve(__dirname, '..', '..', 'web')));
 
 function publish(name, data) {
   const packet = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -62,6 +64,7 @@ app.post('/api/sos', async (req, res) => {
     id: crypto.randomUUID(), category: body.category, trigger: body.trigger || 'manual', client_id: body.client_id || null,
     created_at: new Date().toISOString(), created_ms: now, status: 'received', matches: [], responders: [],
     lat: body.lat, lng: body.lng, preset_id: preset?.id || null, preset_label: preset?.label || null,
+    response_window_s: config.escalateAfterS,
     peak_g: body.trigger === 'crash_auto' ? body.peak_g : undefined,
     pre_impact_kmh: body.trigger === 'crash_auto' ? body.pre_impact_kmh : undefined
   };
@@ -77,6 +80,7 @@ app.post('/api/sos', async (req, res) => {
   event.responders = event.matches.map(row => ({ responder_id: row.responder_id, status: 'notified', sent_at: null, notified_at: null, accepted_at: null, enroute_at: null, arrived_at: null, resolved_at: null, responder_eta_minutes: null, declined_at: null }));
   const raw = all.map(row => ({ ...row, phone: getResponders().find(item => String(item.id) === String(row.id))?.phone || null }));
   const dispatch = await dispatchEvent(event, raw);
+  event.dispatch = dispatch;
   for (const item of dispatch.filter(row => row.ok)) {
     const responder = event.responders.find(row => String(row.responder_id) === String(item.responder_id));
     if (responder) { responder.sent_at = now; responder.notified_at = now; }
@@ -108,10 +112,22 @@ app.get('/api/events', (req, res) => {
   res.json(result.map(event => ({
     id: event.id, category: event.category, trigger: event.trigger, status: event.status,
     created_at: event.created_at, lat: event.lat, lng: event.lng, preset_id: event.preset_id, preset_label: event.preset_label,
-    matches: event.matches.map(({ lat, lng, ...row }) => ({
-      ...row,
-      accept_url: getDispatchLog().find(log => log.sos_id === event.id && String(log.responder_id) === String(row.responder_id))?.message.match(/https?:\/\/\S+/)?.[0] || null
-    }))
+    response_window_s: event.response_window_s,
+    dispatch_label: event.dispatch?.some(row => row.simulated) ? 'SIMULATED DISPATCH' : event.dispatch?.some(row => row.ok) ? 'TEAM WHITELIST DISPATCH' : 'NO DISPATCH',
+    matches: event.matches.map(row => {
+      const current = event.responders.find(responder => String(responder.responder_id) === String(row.responder_id));
+      const delivery = event.dispatch?.find(dispatchRow => String(dispatchRow.responder_id) === String(row.responder_id));
+      const log = getDispatchLog().find(item => item.sos_id === event.id && String(item.responder_id) === String(row.responder_id));
+      const status = event.accepted_at && !current?.accepted_at
+        ? 'closed'
+        : current?.status || (delivery?.ok ? 'notified' : 'not_sent');
+      return {
+        ...row,
+        status,
+        simulated: delivery?.simulated ?? true,
+        accept_url: delivery?.accept_url || log?.message.match(/https?:\/\/\S+/)?.[0] || null
+      };
+    })
   })));
 });
 
@@ -138,11 +154,33 @@ app.get('/api/metrics', (_req, res) => {
   res.json({ n, median_ms: median });
 });
 
-app.get('/r/:token', (req, res) => {
+app.get('/r/:token/info', (req, res) => {
   const pair = eventForToken(req, res);
   if (!pair) return;
   const { event, responder } = pair;
-  res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>RakshaLink responder</title></head><body><main><h1>RakshaLink alert</h1><p>${escapeHtml(event.category)} · ${escapeHtml(responder.name)}</p><p>${escapeHtml(event.preset_label || 'Location label unknown')}</p><p>Status: ${escapeHtml(event.status)}</p><button onclick="fetch(location.pathname+'/accept',{method:'POST'}).then(()=>location.reload())">Accept</button><button onclick="fetch(location.pathname+'/decline',{method:'POST'}).then(()=>location.reload())">Decline</button><footer>© OpenStreetMap contributors</footer></main></body></html>`);
+  const current = event.responders.find(row => String(row.responder_id) === String(responder.responder_id));
+  const delivery = event.dispatch?.find(row => String(row.responder_id) === String(responder.responder_id));
+  let status = current?.status || (delivery?.ok ? 'notified' : 'not_sent');
+  if (event.accepted_at && !current?.accepted_at) status = 'accepted';
+  if (current?.declined_at) status = 'declined';
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    event_id: event.id,
+    category: event.category,
+    status,
+    preset_label: event.preset_label,
+    responder_id: responder.responder_id,
+    responder_name: responder.name,
+    responder_type: responder.type,
+    distance_m: responder.distance_m,
+    simulated: delivery?.simulated ?? true
+  });
+});
+
+app.get('/r/:token', (req, res) => {
+  if (!resolveToken(req.params.token)) return res.status(404).json({ error: 'invalid_or_expired_token' });
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.resolve(__dirname, '..', '..', 'web', 'accept.html'));
 });
 
 app.post('/r/:token/accept', (req, res) => {
@@ -151,6 +189,7 @@ app.post('/r/:token/accept', (req, res) => {
   const row = event.responders.find(r => String(r.responder_id) === String(responder.responder_id));
   if (!row) return res.status(409).json({ error: 'not_available' });
   if (row.declined_at) return res.status(409).json({ error: 'declined' });
+  if (event.responders.some(candidate => candidate.accepted_at && candidate !== row)) return res.status(409).json({ error: 'already_accepted' });
   if (row.accepted_at) return res.json({ ok: true, status: 'accepted' });
   row.accepted_at = Date.now(); row.status = 'accepted'; event.status = 'accepted'; event.accepted_at = row.accepted_at;
   publish('status', { id: event.id, status: 'accepted', responder_id: responder.responder_id });
@@ -161,8 +200,10 @@ app.post('/r/:token/decline', (req, res) => {
   const pair = eventForToken(req, res); if (!pair) return;
   const { event, responder } = pair;
   const row = event.responders.find(r => String(r.responder_id) === String(responder.responder_id));
+  if (!row) return res.status(409).json({ error: 'not_available' });
   if (row.accepted_at) return res.status(409).json({ error: 'already_accepted' });
   row.declined_at = Date.now(); row.status = 'declined';
+  publish('status', { id: event.id, status: 'declined', responder_id: responder.responder_id });
   if (event.responders.every(r => r.declined_at)) { event.status = 'unanswered'; publish('unanswered', { id: event.id, status: event.status }); }
   res.json({ ok: true });
 });
@@ -184,7 +225,5 @@ app.post('/r/:token/status', (req, res) => {
   publish('status', { id: event.id, status: step, responder_id: responder.responder_id });
   res.json({ ok: true, status: step });
 });
-
-function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
 
 module.exports = app;

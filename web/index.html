@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#153b2b" />
+    <title>RakshaLink responder console</title>
+    <link rel="stylesheet" href="/console.css" />
+  </head>
+  <body class="console-page">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="RakshaLink console home"><span class="brand-mark">R</span><span>RakshaLink <small>RESPONDER CONSOLE</small></span></a>
+      <div class="topbar-right"><span class="demo-pill">DEMO MODE</span><span id="connection" class="connection"><i></i>Connecting</span></div>
+    </header>
+    <main class="console-shell">
+      <section class="page-heading"><div><p class="eyebrow">LIVE RESPONSE DESK</p><h1>Alert console</h1><p class="subhead">Review sample alerts and respond only through a valid alert link.</p></div><button id="refresh" class="quiet-button" type="button">Refresh</button></section>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section class="console-grid" aria-label="Responder console">
+        <aside class="panel queue-panel" aria-label="Alert queue">
+          <div class="panel-heading"><div><p class="eyebrow">INCOMING</p><h2>Alert queue</h2></div><span id="queue-count" class="count">0</span></div>
+          <div id="queue" class="queue-list"><div class="empty-state"><span class="empty-icon">✓</span><strong>All clear</strong><span>No alerts are in the queue.</span></div></div>
+          <div class="panel-foot">Alerts and responder records in this demo use sample data.</div>
+        </aside>
+        <section class="panel map-panel" aria-label="Alert map">
+          <div class="panel-heading"><div><p class="eyebrow">LOCATION</p><h2>Rider location</h2></div><span id="map-label" class="map-label">Select an alert</span></div>
+          <div id="map-empty" class="map-empty"><span class="empty-icon">◎</span><strong>Map appears here</strong><span>Select an alert to view its location.</span></div>
+          <iframe id="map" title="OpenStreetMap showing the selected sample alert location" loading="lazy" referrerpolicy="no-referrer" hidden></iframe>
+          <div class="map-legend"><span class="legend-pin"></span> Rider pin <span id="coordinates" class="coordinates">—</span></div>
+          <div class="attribution">© OpenStreetMap contributors</div>
+        </section>
+        <aside class="panel detail-panel" aria-label="Selected alert details">
+          <div class="panel-heading"><div><p class="eyebrow">RESPONSE</p><h2>Alert details</h2></div><span id="detail-status" class="status-pill">—</span></div>
+          <div id="detail-empty" class="empty-state detail-empty"><span class="empty-icon">↖</span><strong>Select an alert</strong><span>Its details and response actions will appear here.</span></div>
+          <div id="detail" hidden>
+            <div class="detail-summary"><span id="category-icon" class="category-icon">!</span><div><h3 id="category-name">—</h3><p id="alert-reference">—</p></div></div>
+            <div id="dispatch-label" class="dispatch-label">SIMULATED DISPATCH</div>
+            <div class="detail-facts"><div><span>Request type</span><strong id="trigger">—</strong></div><div><span>Location preset</span><strong id="preset">—</strong></div><div><span>Received</span><strong id="created">—</strong></div></div>
+            <section class="window-card"><div class="window-top"><span>Response window</span><strong id="countdown">—</strong></div><p id="window-note">Waiting for a responder to accept.</p><div class="window-track"><i id="window-progress"></i></div></section>
+            <section class="matches-section"><div class="section-heading"><h3>Matched responders</h3><span id="match-count">0</span></div><div id="matches" class="matches-list"></div></section>
+          </div>
+        </aside>
+      </section>
+      <footer class="console-footer"><span>RakshaLink · T1 demo console</span><span>SIMULATED DISPATCH is not a real SMS or call.</span></footer>
+    </main>
+    <script src="/console.js" defer></script>
+  </body>
+</html>
