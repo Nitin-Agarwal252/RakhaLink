@@ -1,7 +1,7 @@
 # Architecture
 
 ```text
-Rider app (Expo)  ->  API (Express)  ->  Triage  ->  Match (PostGIS)  ->  Dispatch (SMS/voice)  ->  Responder
+Rider app (Expo)  ->  API (Express)  ->  Triage  ->  Match (haversine)  ->  Dispatch (mock / whitelisted SMS)  ->  Responder
                                                                                    |
                                   Responder Console (web) <-- live updates (SSE) ---+
 ```
@@ -15,7 +15,7 @@ Rider app (Expo)  ->  API (Express)  ->  Triage  ->  Match (PostGIS)  ->  Dispat
 | breakdown | nearest mechanic |
 | fuel | nearest fuel pump |
 
-The mapping lives in one file. If a voice transcript is classified by a model, the output must be one of these four values or it is discarded and the user is asked to confirm.
+The mapping lives in one file. A voice transcript classifier is not implemented. Accident matches include both hospitals and police and are notified sequentially by distance.
 
 ## Data model (core tables)
 
@@ -25,7 +25,7 @@ sos_events(id, category, trigger, channel, geom, status, created_at, peak_g, pre
 dispatch_log(id, sos_id, responder_id, method, ok, token_hash, accepted_at, declined_at, escalation_level, at)
 ```
 
-Nearest match: `ORDER BY geom <-> point LIMIT 3` filtered by the needed responder types. If PostGIS is unavailable, an in-memory haversine search returns the same results.
+The current app uses in-memory haversine distance and sample/demo OSM rows. PostGIS is not configured. Off-duty responders are omitted from new matches.
 
 ## API
 
@@ -35,22 +35,21 @@ Nearest match: `ORDER BY geom <-> point LIMIT 3` filtered by the needed responde
 | `GET /api/sos/:id` | Real status flags: sent, notified, accepted, unanswered |
 | `GET /api/stream` | Server-Sent Events for the Responder Console |
 | `GET /r/:token`, `POST /r/:token/accept` or `decline` | Mobile accept page opened from the SMS link |
-| `POST /api/sms/inbound` | Compact SMS fallback payload, same pipeline |
 | `GET /api/metrics` | Median time-to-dispatch with sample size |
 
 ## Dispatch and escalation
 
-Dispatch sits behind a `PROVIDER` switch: `mock` records what would be sent and labels it **SIMULATED DISPATCH**; `twilio` sends to whitelisted demo numbers. Accept links use random tokens, stored only as hashes, and expire. If no responder accepts within `ESCALATE_AFTER_S`, the next-nearest responder of the needed type is contacted. After three attempts per type, the alert becomes `unanswered` and the rider is told to call 112.
+Dispatch sits behind a `PROVIDER` switch: `mock` labels each notification **SIMULATED DISPATCH**; optional Twilio SMS may send only to configured `DEMO_WHITELIST` numbers. Accept links use random tokens, stored only as hashes, and expire. The nearest on-duty match is notified first. If they decline or do not accept within `ESCALATE_AFTER_S`, the next on-duty match is contacted. When eligible matches are exhausted, the alert becomes `unanswered` and the rider is told to call 112. The flow is in-memory and resets when the server restarts.
 
 ## Drive Mode (crash detection)
 
-A pure state machine: `Idle -> Armed -> Verifying -> Countdown -> SOS`. It arms on sustained driving speed, reacts to an impact spike, and requires a sharp speed drop or stillness within a few seconds. A spike where speed continues is discarded. Thresholds live in one config file and are starting values, not validated on real crashes. Motion data never leaves the phone; only a summary is sent when an alert fires. Tested with synthetic traces: crash, speed breaker, pothole, stationary drop, hard braking.
+A foreground prototype checks for a speed sample of at least 25 km/h within 3 seconds before an impact of at least 3 g, followed within 2 seconds by a drop of at least 25 km/h and speed at or below `max(10 km/h, 35% of pre-impact speed)`. A single spike or missing speed context is ignored. A match starts a 20-second countdown. Motion samples stay on the phone; the event summary and current coordinates are sent only if the countdown completes. Unit tests cover three sample traces; these thresholds are not validated on real crashes and no accuracy claim is made.
 
 ## Offline ladder
 
-1. Data available: call the API.
-2. No data but SMS works: open a prefilled SMS with a compact payload; the gateway runs the same triage.
-3. No signal: Morse SOS (torch and speaker) for people nearby, and the alert is queued until signal returns. Morse does not reach a responder by itself, and the SMS fallback needs a tap on Send.
+1. Data available: submit the SOS to the API.
+2. No data: retain the request in local AsyncStorage. When the API has whitelisted team targets configured, open a prefilled SMS draft to one of them; the rider must review and send it. No target is configured in the current demo.
+3. No signal: show a repeating screen Morse SOS and keep the request in the persisted queue for manual retry after connectivity returns. Screen Morse does not reach a responder and does not activate the torch.
 
 ## Security basics
 
@@ -58,4 +57,4 @@ Hashed accept tokens, rate limiting on `POST /api/sos`, strict input validation,
 
 ## Responder workflow
 
-Responders have an **on duty** switch (off-duty responders are never matched or contacted) and move an alert through `accepted`, `enroute`, `arrived`, `resolved`. Each step is set only by the responder through the same tokenised link used for accepting. The rider sees only real steps. An ETA appears only if the responder typed it, labelled as the responder's estimate. Distances are straight-line, with no computed driving ETA. Role views filter the console: hospital sees medical and accident, police sees accident, mechanic sees breakdown, fuel pump sees fuel.
+The DEMO-only console has an **on duty** switch; off-duty responders are not matched. A responder moves an accepted alert through `enroute`, `arrived`, `resolved` using their tokenized accept link; the rider sees only actual steps. No ETA input is implemented in this phase. Distances are straight-line, with no computed driving ETA. Role views filter the console: hospital sees medical and accident, police sees accident, mechanic sees breakdown, fuel pump sees fuel. Family notification is not implemented because outbound contacts are restricted to approved team numbers.

@@ -10,10 +10,10 @@
   <body class="console-page">
     <header class="topbar">
       <a class="brand" href="/" aria-label="RakshaLink console home"><span class="brand-mark">R</span><span>RakshaLink <small>RESPONDER CONSOLE</small></span></a>
-      <div class="topbar-right"><span class="demo-pill">DEMO MODE</span><span id="connection" class="connection"><i></i>Connecting</span></div>
+      <div class="topbar-right"><label class="view-as-label">View as <select id="view-as" aria-label="View as demo responder role"><option value="">All responder roles</option></select></label><button id="duty-toggle" class="duty-toggle" type="button" disabled>On duty</button><span class="demo-pill">DEMO MODE</span><span id="connection" class="connection"><i></i>Connecting</span></div>
     </header>
     <main class="console-shell">
-      <section class="page-heading"><div><p class="eyebrow">LIVE RESPONSE DESK</p><h1>Alert console</h1><p class="subhead">Review sample alerts and respond only through a valid alert link.</p></div><button id="refresh" class="quiet-button" type="button">Refresh</button></section>
+      <section class="page-heading"><div><p class="eyebrow">LIVE RESPONSE DESK</p><h1>Alert console</h1><p class="subhead">Review sample alerts and respond only through a valid alert link.</p></div><aside class="metric-card"><span>Median SOS-to-dispatch time</span><strong id="metric-value">No dispatched alerts yet</strong><small id="metric-count">Demo session · 0 dispatched requests</small></aside><button id="refresh" class="quiet-button" type="button">Refresh</button></section>
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
       <section class="console-grid" aria-label="Responder console">
         <aside class="panel queue-panel" aria-label="Alert queue">
@@ -40,7 +40,7 @@
           </div>
         </aside>
       </section>
-      <footer class="console-footer"><span>RakshaLink · T1 demo console</span><span>SIMULATED DISPATCH is not a real SMS or call.</span></footer>
+      <footer class="console-footer"><span>RakshaLink · T2 demo console</span><span>SIMULATED DISPATCH is not a real SMS or call.</span></footer>
     </main>
     <script src="/console.js" defer></script>
   </body>

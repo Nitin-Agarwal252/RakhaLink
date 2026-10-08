@@ -39,6 +39,9 @@ function draw(data) {
   if (data.status === 'accepted') {
     actions.hidden = true;
     showResult('This alert has already been accepted.', 'final');
+  } else if (data.status === 'no_response') {
+    actions.hidden = true;
+    showResult('Your response window expired. The alert moved to the next on-duty match.', 'final');
   } else if (['declined', 'not_sent', 'unanswered', 'expired'].includes(data.status)) {
     actions.hidden = true;
     showResult(data.status === 'declined' ? 'You marked this alert as unable to respond.' : 'This alert is no longer available for response.', 'final');
@@ -75,7 +78,7 @@ async function respond(action) {
     } else {
       alertInfo.status = 'declined';
       draw(alertInfo);
-      showResult('Marked as unable to respond. No automatic escalation is enabled in T1.', 'final');
+      showResult('Marked as unable to respond. The system will try the next on-duty match if one is available.', 'final');
     }
   } catch (error) {
     buttons.forEach(button => { button.disabled = false; });

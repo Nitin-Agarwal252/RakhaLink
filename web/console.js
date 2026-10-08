@@ -2,8 +2,14 @@ const queueEl = document.querySelector('#queue');
 const countEl = document.querySelector('#queue-count');
 const connectionEl = document.querySelector('#connection');
 const noticeEl = document.querySelector('#notice');
+const viewAsEl = document.querySelector('#view-as');
+const dutyToggleEl = document.querySelector('#duty-toggle');
+const metricValueEl = document.querySelector('#metric-value');
+const metricCountEl = document.querySelector('#metric-count');
 const selectedMap = new Map();
 let events = [];
+let responders = [];
+let currentRole = '';
 let selectedId = null;
 let eventSource;
 
@@ -30,7 +36,8 @@ function showNotice(message) {
 
 async function loadEvents(keepNotice = false) {
   try {
-    const response = await fetch('/api/events', { cache: 'no-store' });
+    const query = currentRole ? `?role=${encodeURIComponent(currentRole)}` : '';
+    const response = await fetch(`/api/events${query}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`API returned ${response.status}`);
     const data = await response.json();
     events = Array.isArray(data) ? data : [];
@@ -38,10 +45,72 @@ async function loadEvents(keepNotice = false) {
     if (!keepNotice) showNotice('');
     if (!events.some(item => item.id === selectedId)) selectedId = events[0]?.id || null;
     render();
+    loadMetric();
   } catch (error) {
     setConnection(false);
     showNotice(`Cannot reach the RakshaLink API: ${error.message}. Start the server and refresh.`);
   }
+}
+
+async function loadMetric() {
+  try {
+    const response = await fetch('/api/metrics', { cache: 'no-store' });
+    if (!response.ok) return;
+    const metric = await response.json();
+    metricCountEl.textContent = `Demo session · ${Number(metric.n) || 0} dispatched requests`;
+    if (!Number(metric.n) || !Number.isFinite(metric.median_ms)) {
+      metricValueEl.textContent = 'No dispatched alerts yet';
+      return;
+    }
+    const seconds = Math.max(0, metric.median_ms / 1000);
+    metricValueEl.textContent = seconds < 60 ? `${seconds.toFixed(1)} sec` : `${Math.floor(seconds / 60)} min ${Math.round(seconds % 60)} sec`;
+  } catch {}
+}
+
+async function loadResponders() {
+  try {
+    const response = await fetch('/api/responders', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    responders = await response.json();
+    const previous = currentRole;
+    viewAsEl.replaceChildren(new Option('All responder roles', ''));
+    for (const [type, label] of Object.entries({ hospital: 'Hospital', police: 'Police', mechanic: 'Mechanic', fuel_pump: 'Fuel pump' })) {
+      const units = responders.filter(item => item.type === type);
+      if (units.length) viewAsEl.add(new Option(`${label} role · ${units.filter(item => item.on_duty).length} on duty`, type));
+    }
+    if (['hospital', 'police', 'mechanic', 'fuel_pump'].includes(previous)) viewAsEl.value = previous;
+    else currentRole = '';
+    updateDutyToggle();
+  } catch (error) {
+    showNotice(`Could not load demo responder views: ${error.message}`);
+  }
+}
+
+function updateDutyToggle() {
+  const responder = responders.find(item => item.type === currentRole);
+  dutyToggleEl.disabled = !responder;
+  dutyToggleEl.classList.toggle('off-duty', Boolean(responder && !responder.on_duty));
+  dutyToggleEl.textContent = responder?.on_duty ? 'On duty' : 'Off duty';
+  dutyToggleEl.title = responder ? `${responder.on_duty ? 'Set off duty' : 'Set on duty'} for the ${matchLabel(responder.type)} demo representative` : 'Choose a demo responder role';
+}
+
+async function toggleDuty() {
+  const responder = responders.find(item => item.type === currentRole);
+  if (!responder) return;
+  dutyToggleEl.disabled = true;
+  try {
+    const response = await fetch(`/api/responders/${encodeURIComponent(responder.id)}/duty`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ on_duty: !responder.on_duty }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(readable(data.error || 'Could not update duty status'));
+    showNotice(`${responder.name} is now ${data.on_duty ? 'on duty' : 'off duty'}.`);
+    await loadResponders();
+    await loadEvents(true);
+  } catch (error) {
+    showNotice(error.message);
+  } finally { updateDutyToggle(); }
 }
 
 function render() {
@@ -153,14 +222,17 @@ function renderCountdown(item) {
     return;
   }
   const windowSeconds = Number(item.response_window_s) || 20;
-  const elapsed = Math.max(0, (Date.now() - Date.parse(item.created_at)) / 1000);
+  const currentMatch = (item.matches || []).find(match => match.status === 'notified');
+  const startAt = currentMatch?.notified_at || item.created_at;
+  const startMs = Number.isFinite(startAt) ? startAt : Date.parse(startAt);
+  const elapsed = Number.isFinite(startMs) ? Math.max(0, (Date.now() - startMs) / 1000) : 0;
   const remaining = Math.max(0, Math.ceil(windowSeconds - elapsed));
   countdown.textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
   if (remaining > 0) {
-    note.textContent = 'Response window. No automatic escalation is enabled in this T1 build.';
+    note.textContent = 'Waiting for this responder. The next on-duty match is notified if this window expires.';
     bar.style.transform = `scaleX(${Math.min(1, remaining / windowSeconds)})`;
   } else {
-    note.textContent = 'Response window elapsed. No next responder was notified; call 112 if needed.';
+    note.textContent = 'Response window elapsed. Moving to the next on-duty match.';
     bar.style.transform = 'scaleX(0)';
   }
 }
@@ -187,9 +259,15 @@ function renderMatches(item) {
     if (status === 'notified' && match.accept_url) {
       actions.append(makeAction('Accept', 'accept-button', () => responderAction(match.accept_url, 'accept')));
       actions.append(makeAction("Can't respond", 'decline-button', () => responderAction(match.accept_url, 'decline')));
-    } else if (status === 'accepted') {
-      const accepted = document.createElement('span'); accepted.className = 'match-status'; accepted.textContent = 'Accepted';
-      actions.append(accepted);
+    } else if (['accepted', 'enroute', 'arrived'].includes(status) && match.accept_url) {
+      const nextStep = { accepted: 'enroute', enroute: 'arrived', arrived: 'resolved' }[status];
+      const label = { enroute: 'On the way', arrived: 'Arrived', resolved: 'Resolved' }[nextStep];
+      const progress = document.createElement('div'); progress.className = 'progress-actions';
+      progress.append(makeAction(label, 'progress-button', () => progressResponder(match.accept_url, nextStep)));
+      actions.append(progress);
+    } else if (status === 'resolved') {
+      const resolved = document.createElement('span'); resolved.className = 'responder-progress'; resolved.textContent = 'Resolved by responder';
+      actions.append(resolved);
     } else {
       const state = document.createElement('span'); state.className = 'match-status'; state.textContent = status === 'not_sent' ? 'Notification not sent' : readable(status);
       actions.append(state);
@@ -220,6 +298,21 @@ async function responderAction(acceptUrl, action) {
   }
 }
 
+async function progressResponder(acceptUrl, step) {
+  const path = new URL(acceptUrl, location.href).pathname;
+  const buttons = document.querySelectorAll('.match-actions button');
+  buttons.forEach(button => { button.disabled = true; });
+  try {
+    const response = await fetch(`${path.replace(/\/$/, '')}/status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(readable(data.error || 'Could not update responder status'));
+    showNotice(`Responder marked ${readable(step)}.`);
+  } catch (error) { showNotice(error.message); }
+  await loadEvents(true);
+}
+
 function formatAge(value) {
   const ms = Date.now() - Date.parse(value);
   if (!Number.isFinite(ms) || ms < 0) return 'Time unknown';
@@ -235,12 +328,24 @@ function formatDistance(meters) {
   return `${(Number(meters) / 1000).toFixed(1)} km straight-line`;
 }
 
+viewAsEl.addEventListener('change', async () => {
+  currentRole = viewAsEl.value;
+  updateDutyToggle();
+  selectedId = null;
+  await loadEvents();
+  eventSource?.close();
+  eventSource = new EventSource(currentRole ? `/api/stream?role=${encodeURIComponent(currentRole)}` : '/api/stream');
+  eventSource.onopen = () => setConnection(true);
+  eventSource.onerror = () => setConnection(false);
+  for (const type of ['alert', 'status', 'escalated', 'unanswered', 'reset', 'duty']) eventSource.addEventListener(type, () => { loadResponders(); loadEvents(); });
+});
+dutyToggleEl.addEventListener('click', toggleDuty);
 document.querySelector('#refresh').addEventListener('click', () => loadEvents());
-loadEvents();
+loadResponders().then(loadEvents);
 eventSource = new EventSource('/api/stream');
 eventSource.onopen = () => setConnection(true);
 eventSource.onerror = () => setConnection(false);
-for (const type of ['alert', 'status', 'escalated', 'unanswered', 'reset']) {
+for (const type of ['alert', 'status', 'escalating', 'escalated', 'unanswered', 'reset', 'duty']) {
   eventSource.addEventListener(type, () => loadEvents());
 }
 setInterval(() => {

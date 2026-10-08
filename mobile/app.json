@@ -6,6 +6,10 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      ["expo-sensors", { "motionPermission": "RakshaLink uses device motion while crash monitoring is enabled." }],
+      ["expo-location", { "locationWhenInUsePermission": "RakshaLink uses foreground location speed while crash monitoring is enabled." }]
+    ],
     "ios": {
       "supportsTablet": true
     },

@@ -30,5 +30,15 @@ async function findNearest(types, lat, lng, limit = 3, presetId) {
     .slice(0, Math.max(0, limit));
 }
 
-function getResponders() { return responders.map(row => ({ ...row })); }
-module.exports = { findNearest, getResponders, setResponders, haversineMeters };
+function getResponders() { return responders.map(row => ({ ...row, on_duty: row.on_duty !== false })); }
+
+function setOnDuty(id, onDuty) {
+  const responder = responders.find(row => String(row.id) === String(id));
+  if (!responder) return null;
+  responder.on_duty = onDuty;
+  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+  fs.writeFileSync(DATA_FILE, `${JSON.stringify(responders, null, 2)}\n`);
+  return { id: responder.id, responder_id: responder.id, responder_type: responder.type, on_duty: responder.on_duty };
+}
+
+module.exports = { findNearest, getResponders, setResponders, setOnDuty, haversineMeters };

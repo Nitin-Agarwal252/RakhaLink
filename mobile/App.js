@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import { Accelerometer } from 'expo-sensors';
+import { demoCrashTraces, detectCrashSequence } from './crashDetector.mjs';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
 const PRESETS = [
@@ -13,6 +17,8 @@ const CATEGORIES = [
   { id: 'accident', title: 'Accident', hint: 'Road incident', icon: '⚠', color: '#2B3A67', pale: '#E9ECF4' },
   { id: 'medical', title: 'Medical', hint: 'Medical help', icon: '✚', color: '#5B1F2D', pale: '#F3E9EC' },
 ];
+const MORSE_BITS = [1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0];
+const OFFLINE_QUEUE_KEY = 'rakshalink.offline-queue.v1';
 
 function ActionButton({ title, onPress, disabled, style, textStyle }) {
   return (
@@ -32,6 +38,52 @@ export default function App() {
   const [crashDeadline, setCrashDeadline] = useState(null);
   const [countdownSeconds, setCountdownSeconds] = useState(null);
   const [crashNotice, setCrashNotice] = useState('');
+  const [crashSummary, setCrashSummary] = useState({ peak_g: 8.4, pre_impact_kmh: 72 });
+  const [offlineQueue, setOfflineQueue] = useState([]);
+  const [offlineQueueReady, setOfflineQueueReady] = useState(false);
+  const [offlineView, setOfflineView] = useState(false);
+  const [morseOn, setMorseOn] = useState(false);
+  const [smsTargets, setSmsTargets] = useState([]);
+  const [sensorActive, setSensorActive] = useState(false);
+  const [sensorMessage, setSensorMessage] = useState('');
+  const sensorSamplesRef = useRef([]);
+  const lastLocationRef = useRef(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(OFFLINE_QUEUE_KEY).then(value => {
+      if (value) {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          setOfflineQueue(parsed);
+          if (parsed.length) setOfflineView(true);
+        }
+      }
+    }).catch(() => {}).finally(() => setOfflineQueueReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!offlineQueueReady) return;
+    AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(offlineQueue)).catch(() => {});
+  }, [offlineQueue, offlineQueueReady]);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/offline-config`).then(response => response.json()).then(data => {
+      if (Array.isArray(data.sms_targets)) {
+        const targets = data.demo_mode ? data.sms_targets.filter(value => typeof value === 'string') : [];
+        setSmsTargets(targets);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!offlineView) return undefined;
+    let index = 0;
+    const interval = setInterval(() => {
+      setMorseOn(Boolean(MORSE_BITS[index % MORSE_BITS.length]));
+      index += 1;
+    }, 180);
+    return () => { clearInterval(interval); setMorseOn(false); };
+  }, [offlineView]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -65,11 +117,15 @@ export default function App() {
       stopAlarm();
       setCrashNotice('Crash simulation cancelled.');
     }
+    const body = { category, trigger, lat: preset.lat, lng: preset.lng, preset_id: preset.id };
+    if (crashSummary) {
+      const { lat, lng, ...telemetry } = crashSummary;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) Object.assign(body, { lat, lng, preset_id: undefined });
+      Object.assign(body, telemetry);
+    }
     setLoading(true);
     setError('');
     try {
-      const body = { category, trigger, lat: preset.lat, lng: preset.lng, preset_id: preset.id };
-      if (crashSummary) Object.assign(body, crashSummary);
       const response = await fetch(`${API_BASE}/api/sos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,14 +137,20 @@ export default function App() {
       setActive({ id: data.id, category, dispatchStatus: data.status });
     } catch (err) {
       setError(`${err.message} Check that the API is running at ${API_BASE}.`);
+      if (/network|fetch|timeout/i.test(err.message || '')) {
+        setOfflineQueue(current => [...current, { id: `${Date.now()}-${current.length}`, body, category, created_at: new Date().toISOString() }]);
+        setOfflineView(true);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const startCrashSimulation = async () => {
+  const startCrashSimulation = async (summary = { peak_g: 8.4, pre_impact_kmh: 72 }) => {
     setError('');
     setCrashNotice('');
+    setSensorActive(false);
+    setCrashSummary(summary);
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
       alarmPlayer.loop = 'single';
@@ -102,10 +164,53 @@ export default function App() {
   };
 
   const cancelCrashSimulation = () => {
+    setSensorActive(false);
     setCrashDeadline(null);
     setCountdownSeconds(null);
     stopAlarm();
     setCrashNotice('Crash simulation cancelled. No SOS was sent.');
+  };
+
+  const toggleCrashMonitoring = () => {
+    if (sensorActive) {
+      setSensorActive(false);
+      setSensorMessage('Crash monitoring stopped.');
+    } else {
+      setSensorMessage('Requesting foreground location permission…');
+      setSensorActive(true);
+    }
+  };
+
+  const retryQueued = async () => {
+    if (!offlineQueue.length || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      const queued = offlineQueue[0];
+      const response = await fetch(`${API_BASE}/api/sos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(queued.body) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not send queued request.');
+      setOfflineQueue(current => current.slice(1));
+      setOfflineView(false);
+      setActive({ id: data.id, category: queued.category, dispatchStatus: data.status });
+    } catch (err) {
+      setError(`Still offline: ${err.message}`);
+    } finally { setLoading(false); }
+  };
+
+  const discardQueued = () => Alert.alert('Discard offline requests?', 'These local SOS drafts have not been sent.', [
+    { text: 'Keep requests', style: 'cancel' },
+    { text: 'Discard', style: 'destructive', onPress: () => { setOfflineQueue([]); setOfflineView(false); } },
+  ]);
+
+  const openSmsDraft = async () => {
+    const target = smsTargets[0];
+    const queued = offlineQueue[0];
+    if (!target || !queued) return;
+    const place = queued.body.preset_id ? `preset ${queued.body.preset_id}` : 'device location';
+    const body = `RakshaLink demo SOS: ${queued.category}. ${place}, coordinates ${queued.body.lat}, ${queued.body.lng}. This is a draft; RakshaLink did not send it.`;
+    try { await Linking.openURL(`sms:${encodeURIComponent(target)}?body=${encodeURIComponent(body)}`); }
+    catch { setError('Could not open the SMS app. The request remains in the local queue.'); }
   };
 
   useEffect(() => {
@@ -117,13 +222,78 @@ export default function App() {
         setCrashDeadline(null);
         stopAlarm();
         setCrashNotice('Simulation complete. Sending a demo accident alert.');
-        createSos('accident', 'crash_auto', { peak_g: 8.4, pre_impact_kmh: 72 });
+        createSos('accident', 'crash_auto', crashSummary);
       }
     };
     tick();
     const interval = setInterval(tick, 200);
     return () => clearInterval(interval);
   }, [crashDeadline]);
+
+  useEffect(() => {
+    if (!sensorActive) return undefined;
+    let cancelled = false;
+    let accelSubscription;
+    let locationSubscription;
+    const stop = message => {
+      setSensorActive(false);
+      if (message) setSensorMessage(message);
+    };
+    const start = async () => {
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!permission.granted) return stop('Crash monitoring needs foreground location permission for speed context.');
+        const available = await Accelerometer.isAvailableAsync();
+        if (!available) return stop('This device does not expose an accelerometer. Replay the sample traces instead.');
+        sensorSamplesRef.current = [];
+        Accelerometer.setUpdateInterval(100);
+        locationSubscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 1000, distanceInterval: 0 },
+          location => {
+            const speed = location.coords.speed;
+            const at = Date.now();
+            const speedKmh = Number.isFinite(speed) && speed >= 0 ? speed * 3.6 : null;
+            lastLocationRef.current = { lat: location.coords.latitude, lng: location.coords.longitude };
+            if (speedKmh != null) sensorSamplesRef.current.push({ at_ms: at, speed_kmh: speedKmh, impact_g: 0 });
+          },
+          reason => setSensorMessage(`Location speed unavailable: ${reason}`),
+        );
+        if (cancelled) return locationSubscription?.remove();
+        accelSubscription = Accelerometer.addListener(({ x, y, z }) => {
+          const at = Date.now();
+          const magnitude = Math.hypot(x, y, z);
+          const impactG = Math.max(0, magnitude - 1);
+          sensorSamplesRef.current.push({ at_ms: at, speed_kmh: null, impact_g: impactG });
+          sensorSamplesRef.current = sensorSamplesRef.current.filter(sample => at - sample.at_ms <= 6000).slice(-120);
+          const signal = detectCrashSequence(sensorSamplesRef.current);
+          if (signal) {
+            const location = lastLocationRef.current;
+            stop('Sensor sequence matched. A 20-second countdown started; tap I’m OK to cancel.');
+            startCrashSimulation({ peak_g: signal.peak_g, pre_impact_kmh: signal.pre_impact_kmh, ...location });
+          }
+        });
+        setSensorMessage('Monitoring in foreground for speed context, impact, and a sudden stop. This prototype makes no accuracy claim.');
+      } catch (reason) {
+        stop(`Could not start crash monitoring: ${reason?.message || 'sensor unavailable'}`);
+      }
+    };
+    start();
+    return () => {
+      cancelled = true;
+      accelSubscription?.remove();
+      locationSubscription?.remove();
+    };
+  }, [sensorActive]);
+
+  const replayCrashTrace = (trace) => {
+    const signal = detectCrashSequence(trace);
+    if (!signal) {
+      setCrashNotice('Trace ignored: the required speed, impact, and sudden-stop sequence was not present. No SOS was sent.');
+      return;
+    }
+    setCrashNotice('DEMO TRACE matched speed, impact, and sudden stop. Starting the 20-second cancellation countdown.');
+    startCrashSimulation({ peak_g: signal.peak_g, pre_impact_kmh: signal.pre_impact_kmh });
+  };
 
   const call112 = async () => {
     try {
@@ -132,6 +302,32 @@ export default function App() {
       Alert.alert('Call unavailable', 'This device cannot open the phone dialer. Call 112 manually if you need emergency services.');
     }
   };
+
+  if (offlineView && offlineQueue.length) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.offlineSafe]}>
+        <StatusBar barStyle={morseOn ? 'dark-content' : 'light-content'} backgroundColor={morseOn ? '#F7F3DF' : '#111914'} />
+        <ScrollView contentContainerStyle={styles.offlineContent}>
+          <Text style={styles.offlineEyebrow}>OFFLINE LADDER · DEMO</Text>
+          <Text style={styles.offlineTitle}>Request held in offline queue</Text>
+          <Text style={styles.offlineCopy}>Not sent. Retry when connected, or use the available team SMS draft. No responder has accepted. Queue items are stored on this device until retried or removed.</Text>
+          <View style={[styles.morseCard, morseOn && styles.morseCardOn]}>
+            <Text style={[styles.morseSignal, morseOn && styles.morseSignalOn]}>{morseOn ? 'SOS' : '··· ——— ···'}</Text>
+            <Text style={[styles.morseCaption, morseOn && styles.morseSignalOn]}>Screen Morse flash only · does not contact responders</Text>
+          </View>
+          <Text style={styles.queueLabel}>Offline queue · {offlineQueue.length} {offlineQueue.length === 1 ? 'request' : 'requests'}</Text>
+          {offlineQueue.map((item, index) => <Text key={item.id} style={styles.queueItem}>{index + 1}. {CATEGORIES.find(category => category.id === item.category)?.title || 'SOS'} · {item.body.preset_id || 'device location'}</Text>)}
+          {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          <ActionButton title={loading ? 'Retrying…' : 'Retry queued request'} onPress={retryQueued} disabled={loading} style={styles.retryButton} />
+          <ActionButton title={smsTargets.length ? 'Open prefilled team SMS draft' : 'Team SMS unavailable — no whitelist configured'} onPress={openSmsDraft} disabled={!smsTargets.length} style={styles.smsButton} />
+          <Text style={styles.smsNote}>{smsTargets.length ? 'The draft is addressed only to a DEMO_MODE whitelisted team number. Review it; nothing is sent automatically.' : 'No approved team SMS destination was provided by the demo server.'}</Text>
+          <ActionButton title="Discard offline requests" onPress={discardQueued} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
+          <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
+          <ActionButton title="Back to home" onPress={() => setOfflineView(false)} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   if (active) {
     const event = status || {};
@@ -205,6 +401,8 @@ export default function App() {
           <Text style={styles.attribution}>Responder locations are sample/demo data. © OpenStreetMap contributors</Text>
         </View>
 
+        {offlineQueue.length ? <ActionButton title={`Offline queue · ${offlineQueue.length} request${offlineQueue.length === 1 ? '' : 's'}`} onPress={() => setOfflineView(true)} style={styles.retryButton} /> : null}
+
         <View style={styles.grid}>
           {CATEGORIES.map(item => (
             <Pressable key={item.id} accessibilityRole="button" disabled={loading} onPress={() => createSos(item.id)} style={({ pressed }) => [styles.categoryCard, { backgroundColor: item.pale, borderColor: item.color }, pressed && styles.pressed, loading && styles.disabled]}>
@@ -232,6 +430,12 @@ export default function App() {
             <Text style={styles.driveTitle}>Crash alert simulation</Text>
             <Text style={styles.bodyText}>Start a 20-second demo countdown with an alarm. An accident SOS sends automatically unless you cancel.</Text>
             <ActionButton title="Simulate crash" onPress={startCrashSimulation} style={styles.simulateButton} />
+            <ActionButton title={sensorActive ? 'Stop crash monitoring' : 'Start crash monitoring'} onPress={toggleCrashMonitoring} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
+            {sensorMessage ? <Text style={styles.bodyText}>{sensorMessage}</Text> : null}
+            <Text style={styles.crashEyebrow}>REPLAYED SENSOR TRACES · DEMO DATA</Text>
+            <Text style={styles.bodyText}>Trace checks require speed context, impact, and a sudden stop. This build replays sample traces; it does not monitor live sensors.</Text>
+            <ActionButton title="Replay single spike — ignore" onPress={() => replayCrashTrace(demoCrashTraces.singleSpike)} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
+            <ActionButton title="Replay full crash sequence" onPress={() => replayCrashTrace(demoCrashTraces.impactAndSuddenStop)} style={styles.simulateButton} />
           </View>
         )}
         {crashNotice ? <Text style={styles.crashNotice}>{crashNotice}</Text> : null}
@@ -296,4 +500,19 @@ const styles = StyleSheet.create({
   timelineText: { color: '#7A857D', fontSize: 14, flex: 1 },
   timelineTextDone: { color: '#26372E', fontWeight: '700' },
   doneLabel: { color: '#267348', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
+  offlineSafe: { backgroundColor: '#111914' },
+  offlineContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 36, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  offlineEyebrow: { color: '#D9B25C', fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
+  offlineTitle: { color: '#FFFFFF', fontSize: 27, fontWeight: '900', marginTop: 8 },
+  offlineCopy: { color: '#D2D9D3', fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 16 },
+  morseCard: { minHeight: 150, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: '#29312B', padding: 16, marginBottom: 18 },
+  morseCardOn: { backgroundColor: '#F7F3DF' },
+  morseSignal: { color: '#FFFFFF', fontSize: 31, fontWeight: '900', letterSpacing: 3 },
+  morseSignalOn: { color: '#1B2B20' },
+  morseCaption: { color: '#E0E6E1', fontSize: 11, textAlign: 'center', marginTop: 10 },
+  queueLabel: { color: '#F4D895', fontSize: 14, fontWeight: '800', marginBottom: 7 },
+  queueItem: { color: '#FFFFFF', fontSize: 13, paddingVertical: 5 },
+  retryButton: { backgroundColor: '#245740', marginTop: 12 },
+  smsButton: { backgroundColor: '#3D2A5C', marginTop: 10 },
+  smsNote: { color: '#C7D0C9', fontSize: 10, lineHeight: 15, textAlign: 'center', marginTop: 7, marginBottom: 11 },
 });

@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Expo" src="https://img.shields.io/badge/Expo-React%20Native-274706?style=flat-square&logo=expo&logoColor=white">
   <img alt="Node.js" src="https://img.shields.io/badge/Node.js-Express-1B4D4F?style=flat-square&logo=nodedotjs&logoColor=white">
-  <img alt="PostGIS" src="https://img.shields.io/badge/PostgreSQL-PostGIS-2B3A67?style=flat-square&logo=postgresql&logoColor=white">
+  <img alt="Matching" src="https://img.shields.io/badge/matching-haversine-2B3A67?style=flat-square&logo=postgresql&logoColor=white">
   <img alt="OpenStreetMap" src="https://img.shields.io/badge/OpenStreetMap-data-3D2A5C?style=flat-square&logo=openstreetmap&logoColor=white">
 </p>
 
@@ -30,9 +30,9 @@
 
 <table align="center">
   <tr>
-    <td align="center" width="33%"><b>One tap, or no tap</b><br><sub>Four emergencies on one screen. Drive Mode can raise an alert after a detected crash, with a 20-second cancel window.</sub></td>
-    <td align="center" width="33%"><b>The right responder</b><br><sub>Hospital, police, mechanic or fuel pump, chosen by category and real distance. Escalates if nobody answers.</sub></td>
-    <td align="center" width="33%"><b>Built for weak signal</b><br><sub>No data: a prefilled SMS. No signal: a Morse flash for people nearby, and the alert is saved until signal returns.</sub></td>
+    <td align="center" width="33%"><b>Four SOS paths</b><br><sub>Fuel, breakdown, accident, and medical requests use sample locations and deterministic routing.</sub></td>
+    <td align="center" width="33%"><b>Responder workflow</b><br><sub>One on-duty responder is notified at a time. If they time out or decline, the next eligible match is tried.</sub></td>
+    <td align="center" width="33%"><b>Offline support</b><br><sub>Queued SOS drafts persist locally and the screen flashes Morse. A team SMS draft requires a configured whitelist.</sub></td>
   </tr>
 </table>
 
@@ -50,9 +50,7 @@
 
 ## Why RakshaLink exists
 
-According to the Ministry of Road Transport and Highways (*Road Accidents in India 2023*, as cited in our idea deck), India recorded **4,80,583 road accidents** and **1,72,890 deaths** in 2023, about **20 deaths every hour**. Most emergency apps assume you have signal, can unlock your phone, and can say clearly what you need. On a highway, you often can't.
-
-<!-- TODO(G6): re-verify every figure above against the MoRTH report before submission. -->
+The Ministry of Road Transport and Highways reported **1,72,890 people killed in road accidents in 2023** in its [Road Accidents in India 2023 report](https://morth.nic.in/sites/default/files/Road-Accident-in-India-2023-Publications.pdf). RakshaLink explores how a clear SOS and responder workflow might help when a road user needs assistance.
 
 RakshaLink is built for that moment: one tap, one spoken sentence, or **no tap at all**.
 
@@ -64,10 +62,10 @@ RakshaLink is built for that moment: one tap, one spoken sentence, or **no tap a
 |---|---|
 | **Four emergencies, four colours** | Fuel, Breakdown, Accident, Medical SOS. Each routes to the *right kind* of responder, not a generic dispatch. |
 | **Explainable triage** | Deterministic rules map the emergency to responder types and find the nearest ones by real distance. Anything an AI model suggests is validated against the four known categories before it can act. |
-| **Drive Mode (crash-aware)** | The phone watches for a hard impact followed by a sudden stop. A single bump or speed breaker never triggers it. If it does fire, a **20-second alarm countdown** lets you cancel. If you can't, help is sent for you. |
-| **A responder side, not just a victim side** | A desktop **Responder Console** and a mobile accept page. Responders go on duty, see an alert ring with a countdown, accept or decline, then mark On the way, Arrived and Resolved. The rider sees only real statuses. |
-| **Escalation, not hope** | If nobody accepts in time, the alert moves to the next-nearest responder. If everyone fails, the app says so and puts **Call 112** front and centre. |
-| **Offline ladder** | Data works: call the API. No data: a prefilled SMS. No signal: a Morse SOS flash and sound for people nearby, and the alert is queued until signal returns. |
+| **Drive Mode crash response** | The foreground sensor prototype requires speed context, impact, and a sudden stop, then starts a **20-second alarm countdown** with a cancel button. Replayed traces are tested; real crash accuracy and physical-device behavior are unverified. |
+| **Responder workflow** | The desktop console supports demo duty state, role views, Accept / Can't respond, and responder-set On the way, Arrived, and Resolved steps. The rider sees only server-reported statuses. |
+| **Escalation** | Timeout or decline moves to the next on-duty match. If nobody accepts, the app says so and shows **Call 112**. |
+| **Offline ladder** | SOS drafts persist locally, the screen flashes Morse, and the rider can retry when connected. A prefilled SMS draft is limited to configured whitelisted team numbers; no team number is configured in this demo. |
 
 ### How it compares with a plain SOS button
 
@@ -87,13 +85,13 @@ RakshaLink is built for that moment: one tap, one spoken sentence, or **no tap a
 
 ```mermaid
 flowchart LR
-    A["📱 Rider app<br/>tap · speak · crash"] --> B["RakshaLink API"]
+    A["📱 Rider app<br/>tap · replay/sensor crash"] --> B["RakshaLink API"]
     B --> C{"Triage<br/>rules"}
     C -->|medical| D["🏥 nearest hospital"]
     C -->|accident| E["🏥 hospital + 🚓 police"]
     C -->|breakdown| F["🔧 nearest mechanic"]
     C -->|fuel| G["⛽ nearest fuel pump"]
-    D & E & F & G --> H["SMS + voice + accept link"]
+    D & E & F & G --> H["Mock or whitelisted SMS + accept link"]
     H --> I["🖥️ Responder Console"]
     I -->|accept| J["✅ Rider sees: Responder accepted"]
     I -.->|no answer| K["⏭️ next-nearest responder"]
@@ -106,29 +104,31 @@ sequenceDiagram
     participant P as Responder
     R->>S: SOS with category and location
     S->>S: pick responder types, find nearest
-    S->>P: SMS, voice call and accept link
+    S->>P: Notify one on-duty responder (mock; whitelisted SMS if configured)
     alt accepted in time
         P->>S: Accept
         S->>R: Responder accepted
     else no answer
-        S->>P: escalate to next-nearest responder
+        S->>P: Notify next on-duty match
         S->>R: If all fail, No responder answered. Call 112.
     end
 ```
 
-### Drive Mode: crash detection that avoids false alarms
+### Drive Mode: crash response prototype
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Armed: driving speed held
-    Armed --> Verifying: hard impact
-    Verifying --> Armed: speed continues, so it was a bump
-    Verifying --> Countdown: sudden stop
+    Idle --> Armed: user starts foreground monitor
+    Armed --> Verifying: speed context plus impact
+    Verifying --> Armed: speed continues or trace incomplete
+    Verifying --> Countdown: sudden stop within window
     Countdown --> Armed: I am OK
     Countdown --> SOS: 20 s with no cancel
     SOS --> [*]
 ```
+
+The code includes a foreground sensor prototype plus deterministic trace replay tests. It is not validated on real crashes, and no detection accuracy is claimed.
 
 Speed context, an impact spike, and a sudden stop must all agree. Thresholds are starting values and are **not validated on real crashes**. See [docs/SAFETY_AND_HONESTY.md](docs/SAFETY_AND_HONESTY.md).
 
@@ -152,17 +152,18 @@ Calm under stress: big targets, plain words, one dominant action per screen, and
 
 | Tier | Feature | Status |
 |---|---|---|
-| T1 | One-tap SOS (4 categories) with location | ⬜ |
-| T1 | Triage + nearest-responder matching | ⬜ |
-| T1 | Dispatch (mock or real SMS/voice) | ⬜ |
-| T1 | Responder Console + accept page | ⬜ |
-| T1 | Live status with real flags | ⬜ |
-| T1 | Drive Mode: simulate crash, 20 s countdown, auto SOS | ⬜ |
-| T2 | On-duty toggle, On the way / Arrived / Resolved, role views | ⬜ |
-| T2 | Auto-escalation | ⬜ |
-| T2 | Offline ladder (SMS fallback, Morse, queue) | ⬜ |
-| T2 | Sensor-based crash detector | ⬜ |
-| T2 | Family alert, time-to-dispatch metric | ⬜ |
+| T1 | One-tap SOS (4 categories) with sample/demo location | ✅ |
+| T1 | Deterministic triage + nearest-responder matching | ✅ |
+| T1 | Mock dispatch (team SMS not configured) | ✅ |
+| T1 | Responder Console + accept page | ✅ |
+| T1 | Live status with responder-set flags | ✅ |
+| T1 | Drive Mode simulation: 20 s countdown, cancel, auto SOS | ✅ |
+| T2 | On-duty toggle, On the way / Arrived / Resolved, role views | ✅ |
+| T2 | Sequential timeout/decline escalation | ✅ |
+| T2 | Offline queue + screen Morse + whitelisted SMS draft fallback | ◐ |
+| T2 | Foreground sensor prototype + replayed crash traces | ◐ |
+| T2 | Family alert | Deferred: no permitted family destination under current outbound-contact rule |
+| T2 | SOS-to-first-dispatch metric | ✅ |
 | T3 | Voice SOS, language toggle, share, history | ⬜ |
 | T3 | Responder history, operations overview | ⬜ |
 
@@ -172,8 +173,8 @@ Calm under stress: big targets, plain words, one dominant action per screen, and
 |---|---|
 | Mobile | Expo + React Native |
 | Backend | Node.js + Express, Server-Sent Events for live updates |
-| Data | PostgreSQL + PostGIS (with a haversine fallback), responders seeded from OpenStreetMap |
-| Comms | SMS gateway and text-to-speech voice, behind a mock/real provider switch |
+| Data | In-memory haversine matching; responder demo points seeded from OpenStreetMap. PostGIS is not configured. |
+| Comms | Mock dispatch by default; optional Twilio SMS to configured whitelisted team numbers. Voice is not implemented. |
 | Maps | OpenStreetMap |
 
 ## Repository layout
