@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="RakshaLink: Help, when you need it most." width="100%">
+  <img src="assets/banner.jpeg" alt="RakshaLink: Help, when you need it most." width="100%">
 </p>
 
 <h3 align="center">Not just an SOS button.<br>A triage agent that knows exactly who to call, online or off.</h3>
@@ -78,6 +78,14 @@ RakshaLink is built for that moment: one tap, one spoken sentence, or **no tap a
 | Weak or no signal | fails | SMS fallback, Morse flash, saved queue |
 
 > RakshaLink **augments** India's 112 emergency number; it does not replace it. A Call 112 button is on every screen.
+
+## Crash & Relay Simulation
+
+The project ZIP also includes a separate browser-based visual simulation for presentations: [Open the Crash & Relay Simulation](https://demosimulation.vercel.app/). It demonstrates scripted crash detection, network modes (Full, Weak, and Zero), simulated dispatch, and a mock responder console. The supplied ZIP describes the simulation as a concept demo; its speeds, impacts, and responders are scripted.
+
+The simulation's **Pitch run** plays a presentation sequence. You can also run **Simulate crash**, **Speed-breaker test**, and **Hard-brake test**. Keyboard shortcuts: `Space` start/pause, `R` reset, `1`/`2`/`3` select network mode, `C` change camera, and `P` toggle presentation mode.
+
+This visual simulation does not make real calls or send SMS. Its Bluetooth/Wi-Fi relay is a roadmap concept; the mobile app's current offline flow is the on-device queue, screen Morse signal, and optional prefilled SMS draft described above.
 
 <p align="center"><img src="assets/divider.svg" width="520" alt=""></p>
 
