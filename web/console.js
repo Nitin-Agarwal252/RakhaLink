@@ -267,8 +267,19 @@ function renderMatches(item) {
       const nextStep = { accepted: 'enroute', enroute: 'arrived', arrived: 'resolved' }[status];
       const label = { enroute: 'On the way', arrived: 'Arrived', resolved: 'Resolved' }[nextStep];
       const progress = document.createElement('div'); progress.className = 'progress-actions';
-      progress.append(makeAction(label, 'progress-button', () => progressResponder(match.accept_url, nextStep)));
+      if (nextStep === 'enroute') {
+        const etaLabel = document.createElement('label'); etaLabel.className = 'eta-entry'; etaLabel.textContent = 'Your estimate (min, optional)';
+        const etaInput = document.createElement('input'); etaInput.type = 'number'; etaInput.min = '1'; etaInput.max = '1440'; etaInput.step = '1'; etaInput.inputMode = 'numeric'; etaInput.placeholder = 'e.g. 18'; etaInput.setAttribute('aria-label', 'Responder-entered estimate in minutes');
+        etaLabel.append(etaInput); progress.append(etaLabel);
+        progress.append(makeAction(label, 'progress-button', () => progressResponder(match.accept_url, nextStep, etaInput.value)));
+      } else {
+        progress.append(makeAction(label, 'progress-button', () => progressResponder(match.accept_url, nextStep)));
+      }
       actions.append(progress);
+      if (Number.isFinite(match.responder_eta_minutes)) {
+        const eta = document.createElement('span'); eta.className = 'responder-progress'; eta.textContent = `Responder-entered estimate: ${match.responder_eta_minutes} min`;
+        actions.append(eta);
+      }
     } else if (status === 'resolved') {
       const resolved = document.createElement('span'); resolved.className = 'responder-progress'; resolved.textContent = 'Resolved by responder';
       actions.append(resolved);
@@ -302,13 +313,18 @@ async function responderAction(acceptUrl, action) {
   }
 }
 
-async function progressResponder(acceptUrl, step) {
+async function progressResponder(acceptUrl, step, etaValue = '') {
   const path = new URL(acceptUrl, location.href).pathname;
+  const etaMinutes = etaValue.trim() ? Number(etaValue) : null;
+  if (etaValue.trim() && (!Number.isInteger(etaMinutes) || etaMinutes < 1 || etaMinutes > 1440)) {
+    showNotice('Enter a whole-number estimate from 1 to 1440 minutes, or leave it blank.');
+    return;
+  }
   const buttons = document.querySelectorAll('.match-actions button');
   buttons.forEach(button => { button.disabled = true; });
   try {
     const response = await fetch(`${path.replace(/\/$/, '')}/status`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step, ...(step === 'enroute' && etaMinutes != null ? { eta_minutes: etaMinutes } : {}) }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(readable(data.error || 'Could not update responder status'));

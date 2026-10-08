@@ -354,7 +354,7 @@ export default function App() {
             <Text style={styles.bodyText}>SIMULATED DISPATCH · DEMO MODE</Text>
             {!accepted && !unanswered ? <Text style={styles.bodyText}>Help is not confirmed until a responder accepts.</Text> : null}
             {accepted && event.responders?.[0] ? <Text style={styles.bodyText}>{event.responders[0].name} · {event.responders[0].type.replace('_', ' ')}</Text> : null}
-            {accepted && Number.isFinite(event.responder_eta_minutes) ? <Text style={styles.bodyText}>Responder estimate: {event.responder_eta_minutes} min</Text> : null}
+            {accepted && Number.isFinite(event.responder_eta_minutes) ? <Text style={styles.bodyText}>Responder-entered estimate: {event.responder_eta_minutes} min</Text> : null}
             {event.family_alert?.status === 'simulated' ? <Text style={styles.familyAlert}>SIMULATED FAMILY ALERT · No contact was notified.</Text> : null}
           </View>
           <Text style={styles.sectionTitle}>Request timeline</Text>

@@ -42,6 +42,8 @@
 - Every SOS response carries a local-only `family_alert` demo record. API and console/mobile UI say `SIMULATED FAMILY ALERT` and “No contact was notified.” No destination is accepted or stored; nothing is sent.
 - Local mock HTTP verification confirmed the field on create/status/events and HTTP 400 for a supplied contact payload.
 - Real family messaging remains unavailable under the outbound-contact rule and requires a separately approved contact policy before implementation.
+- T3 started: `enroute` accepts optional responder-entered ETA minutes; console event rows expose that value for display. No route-based ETA is calculated.
+- Local mock API flow verified responder enters 18 minutes during `enroute`, and rider/events return the exact value. Non-`enroute` ETA writes are rejected (HTTP 400).
 
 ## Overall T1 integration — 8 Oct 2026
 - Static desktop console and tokenized responder accept page are served by Express; both use API data, explicit demo dispatch labeling, and OpenStreetMap attribution.

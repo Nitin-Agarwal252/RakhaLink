@@ -28,6 +28,8 @@
 - Foreground crash-monitoring prototype reads location speed and accelerometer data; it requires a recent speed context, an impact, and a sudden speed drop before a 20-second countdown. Sample trace replay rejects an isolated spike. No accuracy claim or background monitoring.
 - Console displays a median SOS-to-first-dispatch metric based on successful dispatches in the current in-memory demo session.
 - SOS status and console now show an in-memory `SIMULATED FAMILY ALERT` record with `sent: false`, no destination, and the explicit message that no contact was notified. No family contact is collected, stored, or messaged.
+- Began T3 responder-entered ETA: console has an optional whole-minute input on the On the way action, API events return the responder-supplied value, and the rider labels it as an estimate. No computed ETA is introduced.
+- ETA mock integration passed: accepted a medical alert, recorded an 18-minute responder-entered estimate on `enroute`, and verified both rider status and console event API return 18; an ETA supplied on `arrived` was rejected (HTTP 400).
 
 ### Verification
 - `npm test`: 5 passed, 0 failed; server and console JavaScript syntax checks passed.

@@ -179,6 +179,7 @@ app.get('/api/events', (req, res) => {
       return {
         ...row,
         status,
+        responder_eta_minutes: current?.responder_eta_minutes ?? null,
         notified_at: current?.notified_at ? new Date(current.notified_at).toISOString() : null,
         simulated: delivery?.simulated ?? true,
         accept_url: delivery?.accept_url || log?.message.match(/https?:\/\/\S+/)?.[0] || null
@@ -320,7 +321,7 @@ app.post('/r/:token/status', (req, res) => {
   if (!row?.[required]) return res.status(409).json({ error: 'steps_must_be_in_order' });
   const timestamp = `${step}_at`;
   if (row[timestamp]) return res.status(409).json({ error: 'step_already_set' });
-  if (req.body.eta_minutes != null && (!Number.isFinite(req.body.eta_minutes) || req.body.eta_minutes < 0 || req.body.eta_minutes > 1440)) return res.status(400).json({ error: 'invalid_eta' });
+  if (req.body.eta_minutes != null && (step !== 'enroute' || !Number.isInteger(req.body.eta_minutes) || req.body.eta_minutes < 1 || req.body.eta_minutes > 1440)) return res.status(400).json({ error: 'invalid_eta' });
   row[timestamp] = Date.now(); row.status = step; event.status = step; event[timestamp] = row[timestamp];
   const progressedMatch = event.matches.find(match => String(match.responder_id) === String(responder.responder_id));
   if (progressedMatch) progressedMatch.status = step;

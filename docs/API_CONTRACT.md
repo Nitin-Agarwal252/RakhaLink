@@ -42,7 +42,7 @@ Errors: `400 {"error":"invalid_category"}`, `400 {"error":"invalid_location"}`, 
 - `GET /r/:token/info` private alert and responder details for the accept page; returns no phone number
 - `POST /r/:token/accept` returns `{ "ok": true, "status": "accepted" }`
 - `POST /r/:token/decline` returns `{ "ok": true }`; a decline immediately notifies the next on-duty match. If none remain, status becomes `unanswered`.
-- `POST /r/:token/status` body `{ "step": "enroute" | "arrived" | "resolved", "eta_minutes": 8 }` (`eta_minutes` optional). Steps must go in order.
+- `POST /r/:token/status` body `{ "step": "enroute" | "arrived" | "resolved", "eta_minutes": 18 }` (`eta_minutes` optional; responder-entered integer from 1–1440, accepted with the `enroute` step). Steps must go in order.
 - `GET /api/responders` returns sample/demo responder role and duty fields, without phone numbers.
 - `POST /api/responders/:id/duty` (DEMO_MODE only) body `{ "on_duty": false }`; off-duty responders are excluded from new matching.
 
