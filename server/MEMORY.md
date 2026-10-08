@@ -11,7 +11,7 @@
 ### Verification (real output)
 - `npm run seed`:
   - GNIT: hospital 197, police 25, mechanic 1, fuel pump 53; all searches 15 km.
-  - NH-19 Durgapur: hospital 22, police 1, mechanic 0, fuel pump 4; mechanic widened to 30 km and still returned 0.
+- NH-19 Durgapur: hospital 22, police 1, mechanic 0, fuel pump 4; mechanic widened to 30 km and a successful Overpass query confirmed 0 results. The seed retries three documented global Overpass instances and records unavailable results distinctly from confirmed zero counts.
 - Cache validation: 276 GNIT rows, 27 Durgapur rows; zero rows missing `is_demo`/`is_sample` or with a mismatched preset id.
 - Haversine cache audit: zero rows outside their recorded query radius. Maximum Durgapur distances were 14,410 m (hospital), 13,149 m (police), and 14,270 m (fuel pump); the mechanic result count is zero after the 30 km query.
 - `npm test`: 5 passed, 0 failed.

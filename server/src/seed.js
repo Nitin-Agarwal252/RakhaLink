@@ -42,7 +42,11 @@ async function fetchElements(preset, radiusKm, selectedTypes = types) {
   const filtersForQuery = selectedTypes.map(type => `nwr(around:${radiusM},${preset.lat},${preset.lng})${filters[type]};`).join('');
   const query = `[out:json][timeout:25];(${filtersForQuery});out center tags;`;
   let lastError;
-  for (const endpoint of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+  for (const endpoint of [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+  ]) {
     try {
       const response = await fetch(endpoint, {
         method: 'POST', headers: {
