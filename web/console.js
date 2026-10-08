@@ -7,6 +7,13 @@ const dutyToggleEl = document.querySelector('#duty-toggle');
 const metricValueEl = document.querySelector('#metric-value');
 const metricCountEl = document.querySelector('#metric-count');
 const queueTabs = [...document.querySelectorAll('[data-queue-view]')];
+const ops = {
+  scope: document.querySelector('#ops-scope'),
+  active: document.querySelector('#ops-active'),
+  accepted: document.querySelector('#ops-accepted'),
+  unanswered: document.querySelector('#ops-unanswered'),
+  onDuty: document.querySelector('#ops-on-duty'),
+};
 const selectedMap = new Map();
 let events = [];
 let responders = [];
@@ -116,6 +123,7 @@ async function toggleDuty() {
 }
 
 function render() {
+  renderOperations();
   const closedStatuses = ['resolved', 'unanswered'];
   const visibleEvents = events.filter(item => queueView === 'history' ? closedStatuses.includes(item.status) : !closedStatuses.includes(item.status));
   countEl.textContent = String(visibleEvents.length);
@@ -157,6 +165,16 @@ function render() {
   }
   queueEl.replaceChildren(fragment);
   renderDetails(visibleEvents.find(item => item.id === selectedId) || null);
+}
+
+function renderOperations() {
+  const closed = new Set(['resolved', 'unanswered']);
+  const accepted = new Set(['accepted', 'enroute', 'arrived']);
+  ops.scope.textContent = currentRole ? `${matchLabel(currentRole)} role view` : 'All responder roles';
+  ops.active.textContent = String(events.filter(item => !closed.has(item.status)).length);
+  ops.accepted.textContent = String(events.filter(item => accepted.has(item.status)).length);
+  ops.unanswered.textContent = String(events.filter(item => item.status === 'unanswered').length);
+  ops.onDuty.textContent = String(responders.filter(item => (!currentRole || item.type === currentRole) && item.on_duty).length);
 }
 
 function makeEmpty(icon, title, message) {

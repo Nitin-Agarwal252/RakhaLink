@@ -14,6 +14,16 @@
     </header>
     <main class="console-shell">
       <section class="page-heading"><div><p class="eyebrow">LIVE RESPONSE DESK</p><h1>Alert console</h1><p class="subhead">Review sample alerts and respond only through a valid alert link.</p></div><aside class="metric-card"><span>Median SOS-to-dispatch time</span><strong id="metric-value">No dispatched alerts yet</strong><small id="metric-count">Demo session · 0 dispatched requests</small></aside><button id="refresh" class="quiet-button" type="button">Refresh</button></section>
+      <section class="ops-overview" aria-label="Operations overview">
+        <div class="ops-heading"><div><p class="eyebrow">CURRENT DEMO SESSION</p><h2>Operations overview</h2></div><span id="ops-scope">All responder roles</span></div>
+        <div class="ops-grid">
+          <article><span>Active alerts</span><strong id="ops-active">0</strong></article>
+          <article><span>Accepted · in progress</span><strong id="ops-accepted">0</strong></article>
+          <article><span>Unanswered</span><strong id="ops-unanswered">0</strong></article>
+          <article><span>Sample responders on duty</span><strong id="ops-on-duty">0</strong></article>
+        </div>
+        <p class="ops-note">Counts reflect this view and this server session. They reset when the demo server restarts.</p>
+      </section>
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
       <section class="console-grid" aria-label="Responder console">
         <aside class="panel queue-panel" aria-label="Alert queue">

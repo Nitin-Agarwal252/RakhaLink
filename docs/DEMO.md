@@ -9,6 +9,7 @@
 6. **Offline ladder:** show the persisted queue and screen Morse signal, then restore signal and retry manually. The SMS draft is available only if a whitelisted team destination is configured; no destination is configured now.
 7. Show the rider status and console `SIMULATED FAMILY ALERT` record; both state that no contact was notified.
 8. Use the console's **History** tab to show resolved/unanswered alerts from the current demo server session; restart clears that history.
+9. Point to the Operations overview for current-view active, accepted/in-progress, unanswered, and on-duty counts. They are session counts, not performance claims.
 
 ## What is real and what is simulated
 | Part | Status |

@@ -167,7 +167,7 @@ Calm under stress: big targets, plain words, one dominant action per screen, and
 | T3 | Voice SOS, language toggle, share, history | ⬜ |
 | T3 | Responder-entered ETA estimate | ◐ In progress; optional estimate is typed by the responder and shown as such |
 | T3 | Responder history | ◐ Resolved and unanswered alerts from the current demo session |
-| T3 | Operations overview | ⬜ |
+| T3 | Operations overview | ◐ Current-session alert and on-duty counts, scoped to the selected view |
 
 ## Tech stack
 
