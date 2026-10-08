@@ -32,6 +32,7 @@
 - ETA mock integration passed: accepted a medical alert, recorded an 18-minute responder-entered estimate on `enroute`, and verified both rider status and console event API return 18; an ETA supplied on `arrived` was rejected (HTTP 400).
 - T3 responder history view: console Active/History tabs split live statuses from resolved/unanswered alerts using the existing in-memory events feed. History is explicitly limited to this server session. Frontend-only change; no API or Expo process restart.
 - T3 operations overview: four current-session counters (active, accepted/in progress, unanswered, sample responders on duty), scoped to the selected responder role when one is selected. UI labels these as demo-session counts, not performance claims. Frontend-only; no API or Expo process restart.
+- Judge-ready visual pass: added the supplied brand logo to mobile home/status/offline/crash views and responder console/accept headers; restyled the crash countdown as a dedicated screen. Existing SOS, countdown, cancellation, and mock dispatch handlers were kept unchanged; no immediate-send button added. An initial export caught a Metro asset-path issue, fixed by placing the mobile copy under `mobile/assets`; final Android export passed (622 modules, 1.6 MB JS bundle, 44 KB alarm, 51 KB logo). The API stayed healthy on the existing process.
 
 ### Verification
 - `npm test`: 5 passed, 0 failed; server and console JavaScript syntax checks passed.

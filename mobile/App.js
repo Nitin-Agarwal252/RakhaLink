@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -25,6 +25,15 @@ function ActionButton({ title, onPress, disabled, style, textStyle }) {
     <Pressable accessibilityRole="button" onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, style, disabled && styles.disabled, pressed && !disabled && styles.pressed]}>
       <Text style={[styles.buttonText, textStyle]}>{title}</Text>
     </Pressable>
+  );
+}
+
+function BrandHeader() {
+  return (
+    <View style={styles.brandHeader}>
+      <Image accessibilityLabel="RakshaLink" source={require('./assets/rakshalink-logo.png')} resizeMode="contain" style={styles.brandLogo} />
+      <Text style={styles.demoBadge}>DEMO</Text>
+    </View>
   );
 }
 
@@ -308,6 +317,7 @@ export default function App() {
       <SafeAreaView style={[styles.safe, styles.offlineSafe]}>
         <StatusBar barStyle={morseOn ? 'dark-content' : 'light-content'} backgroundColor={morseOn ? '#F7F3DF' : '#111914'} />
         <ScrollView contentContainerStyle={styles.offlineContent}>
+          <BrandHeader />
           <Text style={styles.offlineEyebrow}>OFFLINE LADDER · DEMO</Text>
           <Text style={styles.offlineTitle}>Request held in offline queue</Text>
           <Text style={styles.offlineCopy}>Not sent. Retry when connected, or use the available team SMS draft. No responder has accepted. Queue items are stored on this device until retried or removed.</Text>
@@ -324,6 +334,38 @@ export default function App() {
           <ActionButton title="Discard offline requests" onPress={discardQueued} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
           <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
           <ActionButton title="Back to home" onPress={() => setOfflineView(false)} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (crashDeadline) {
+    const peak = Number.isFinite(crashSummary.peak_g) ? `${crashSummary.peak_g.toFixed(1)} g` : 'Unavailable';
+    const speed = Number.isFinite(crashSummary.pre_impact_kmh) ? `${Math.round(crashSummary.pre_impact_kmh)} km/h` : 'Unavailable';
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F0EFDF" />
+        <ScrollView contentContainerStyle={styles.crashContent}>
+          <BrandHeader />
+          <Text style={styles.crashEyebrow}>DRIVE MODE · DEMO</Text>
+          <Text style={styles.crashTitle}>Crash detected. Are you OK?</Text>
+          <View style={styles.countdownPanel} accessibilityLiveRegion="assertive">
+            <View style={styles.countdownRing}>
+              <Text style={styles.countdownNumber}>{String(countdownSeconds ?? 20)}</Text>
+              <Text style={styles.countdownUnit}>seconds</Text>
+            </View>
+            <Text style={styles.countdownCopy}>If you do not cancel, a demo Accident SOS will be sent when the timer reaches zero.</Text>
+          </View>
+          <ActionButton title="I’m OK — cancel alert" onPress={cancelCrashSimulation} style={styles.okButton} />
+          <View style={styles.readingsCard}>
+            <Text style={styles.readingsTitle}>Detection readings · DEMO MODE</Text>
+            <View style={styles.readingsRow}>
+              <View style={styles.reading}><Text style={styles.readingLabel}>Peak impact</Text><Text style={styles.readingValue}>{peak}</Text></View>
+              <View style={styles.reading}><Text style={styles.readingLabel}>Speed before</Text><Text style={styles.readingValue}>{speed}</Text></View>
+            </View>
+            <Text style={styles.readingsNote}>Prototype heuristic shown for demonstration. It is not validated for real crashes.</Text>
+          </View>
+          {crashNotice ? <Text style={styles.crashNotice}>{crashNotice}</Text> : null}
         </ScrollView>
       </SafeAreaView>
     );
@@ -347,6 +389,7 @@ export default function App() {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="dark-content" backgroundColor="#F7F8F6" />
         <ScrollView contentContainerStyle={styles.content}>
+          <BrandHeader />
           <Text style={styles.eyebrow}>RAKSHALINK · REQUEST STATUS</Text>
           <Text style={styles.title}>Your {category?.title.toLowerCase()} request</Text>
           <View style={styles.statusCard}>
@@ -377,6 +420,8 @@ export default function App() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F8F6" />
       <ScrollView contentContainerStyle={styles.content}>
+        <BrandHeader />
+          <Text style={styles.tagline}>Help, routed to the right hands.</Text>
         <Text style={styles.eyebrow}>RAKSHALINK · HIGHWAY ASSISTANCE</Text>
         <Text style={styles.title}>What do you need?</Text>
         <Text style={styles.subtitle}>Choose the closest match. Your location preset will be shared with the demo service.</Text>
@@ -417,16 +462,7 @@ export default function App() {
         {loading ? <Text style={styles.loading}>Sending demo request…</Text> : null}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
 
-        {crashDeadline ? (
-          <View style={styles.crashCard} accessibilityLiveRegion="assertive">
-            <Text style={styles.crashEyebrow}>SIMULATE CRASH · DEMO DATA</Text>
-            <Text style={styles.crashTitle}>Are you okay?</Text>
-            <Text style={styles.countdownNumber}>{String(countdownSeconds ?? 20)}</Text>
-            <Text style={styles.bodyText}>Alarm sounding. A demo accident SOS sends automatically when the countdown ends.</Text>
-            <ActionButton title="I’m OK — cancel alert" onPress={cancelCrashSimulation} style={styles.okButton} />
-          </View>
-        ) : (
-          <View style={styles.driveCard}>
+        <View style={styles.driveCard}>
             <Text style={styles.driveEyebrow}>DRIVE MODE</Text>
             <Text style={styles.driveTitle}>Crash alert simulation</Text>
             <Text style={styles.bodyText}>Start a 20-second demo countdown with an alarm. An accident SOS sends automatically unless you cancel.</Text>
@@ -437,8 +473,7 @@ export default function App() {
             <Text style={styles.bodyText}>Trace checks require speed context, impact, and a sudden stop. This build replays sample traces; it does not monitor live sensors.</Text>
             <ActionButton title="Replay single spike — ignore" onPress={() => replayCrashTrace(demoCrashTraces.singleSpike)} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} />
             <ActionButton title="Replay full crash sequence" onPress={() => replayCrashTrace(demoCrashTraces.impactAndSuddenStop)} style={styles.simulateButton} />
-          </View>
-        )}
+        </View>
         {crashNotice ? <Text style={styles.crashNotice}>{crashNotice}</Text> : null}
         <ActionButton title="Call 112" onPress={call112} style={styles.callButton} />
         <Text style={styles.footer}>DEMO MODE · Dispatch is simulated. Call 112 opens the phone dialer only when tapped.</Text>
@@ -450,6 +485,11 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F7F8F6' },
   content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 36, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  brandHeader: { minHeight: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 4, marginBottom: 17, borderRadius: 12, backgroundColor: '#0D160D' },
+  brandLogo: { width: 230, height: 54 },
+  demoBadge: { marginHorizontal: 7, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1, borderColor: '#C8A951', backgroundColor: '#FFF2C4', color: '#6D4E0E', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
+  tagline: { color: '#657169', fontSize: 13, lineHeight: 18, marginTop: -8, marginBottom: 14 },
+  crashContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, maxWidth: 560, width: '100%', alignSelf: 'center', backgroundColor: '#F0EFDF', flexGrow: 1 },
   eyebrow: { color: '#66746C', fontSize: 11, fontWeight: '800', letterSpacing: 1.4, marginBottom: 8 },
   title: { color: '#14271F', fontSize: 29, fontWeight: '800', letterSpacing: -0.5 },
   subtitle: { color: '#59675F', fontSize: 15, lineHeight: 22, marginTop: 7, marginBottom: 18 },
@@ -476,11 +516,21 @@ const styles = StyleSheet.create({
   driveEyebrow: { color: '#66746C', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   driveTitle: { color: '#23342B', fontSize: 17, fontWeight: '800', marginTop: 5, marginBottom: 5 },
   simulateButton: { backgroundColor: '#19385D', marginTop: 13 },
-  crashCard: { alignItems: 'center', backgroundColor: '#FFF8EE', borderWidth: 2, borderColor: '#C93636', borderRadius: 18, padding: 18, marginTop: 17, marginBottom: 14 },
-  crashEyebrow: { color: '#9B3030', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  crashTitle: { color: '#4A2525', fontSize: 23, fontWeight: '900', marginTop: 9 },
-  countdownNumber: { color: '#A52424', fontSize: 64, fontWeight: '900', lineHeight: 76, fontVariant: ['tabular-nums'] },
-  okButton: { width: '100%', minHeight: 66, backgroundColor: '#267348', marginTop: 16 },
+  crashEyebrow: { color: '#69705F', fontSize: 11, fontWeight: '900', letterSpacing: 1.2, marginTop: 3 },
+  crashTitle: { color: '#26331F', fontSize: 26, lineHeight: 33, fontWeight: '900', marginTop: 8, marginBottom: 16 },
+  countdownPanel: { alignItems: 'center', backgroundColor: '#FBFAF4', borderWidth: 1, borderColor: '#E1DFD3', borderRadius: 18, padding: 22, marginBottom: 14 },
+  countdownRing: { width: 190, height: 190, alignItems: 'center', justifyContent: 'center', borderRadius: 95, borderWidth: 9, borderColor: '#204C08', backgroundColor: '#FBFAF4' },
+  countdownNumber: { color: '#22331A', fontSize: 58, fontWeight: '900', lineHeight: 66, fontVariant: ['tabular-nums'] },
+  countdownUnit: { color: '#74796A', fontSize: 13, marginTop: 1 },
+  countdownCopy: { color: '#62685B', fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 19 },
+  okButton: { width: '100%', minHeight: 60, backgroundColor: '#214A08', marginTop: 2, marginBottom: 14, borderRadius: 14 },
+  readingsCard: { backgroundColor: '#FBFAF4', borderWidth: 1, borderColor: '#E1DFD3', borderRadius: 16, padding: 15, marginTop: 2 },
+  readingsTitle: { color: '#293624', fontSize: 15, fontWeight: '800', marginBottom: 10 },
+  readingsRow: { flexDirection: 'row', gap: 9 },
+  reading: { flex: 1, backgroundColor: '#F1F0E8', borderRadius: 10, padding: 11 },
+  readingLabel: { color: '#74796A', fontSize: 11 },
+  readingValue: { color: '#293624', fontSize: 16, fontWeight: '800', marginTop: 4 },
+  readingsNote: { color: '#74796A', fontSize: 11, lineHeight: 17, marginTop: 12 },
   crashNotice: { color: '#66746C', textAlign: 'center', fontSize: 12, marginBottom: 8 },
   bodyText: { color: '#657169', fontSize: 13, lineHeight: 19, marginTop: 5 },
   button: { alignItems: 'center', justifyContent: 'center', borderRadius: 15, minHeight: 56, paddingHorizontal: 18 },

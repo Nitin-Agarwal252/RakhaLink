@@ -10,6 +10,8 @@ Expo Go compatible rider app for home, SOS/status, offline support, and crash re
 
 The app offers the two API presets, four SOS categories, a live status poll, and a manual Call 112 button that opens the dialer only after a tap. Drive Mode supports a 20-second simulated countdown and a foreground sensor prototype that requires speed context, impact, and a sudden stop before starting the same cancellable countdown. Replayed sample traces show that a single spike is ignored. This prototype makes no accuracy claim and is not validated for real driving.
 
+The supplied RakshaLink logo appears in the home, status, offline, and crash-countdown headers. The crash countdown is presented as a dedicated visual screen; its timer, cancel action, and mock Accident SOS behavior remain unchanged. No immediate-send action is shown.
+
 If SOS submission fails because the network is unreachable, the request is stored in local AsyncStorage. The offline screen shows a repeating screen-based Morse SOS pattern and retries the queued request. If the demo API provides a whitelisted team number, the app can open a prefilled SMS draft to that number; it never sends the SMS. No destination is configured in the current demo environment, so that action is unavailable. The Morse screen does not contact responders. Call 112 remains manual.
 
 ## Verification
