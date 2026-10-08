@@ -192,7 +192,15 @@ rakshalink/
 
 ## Getting started
 
-Setup steps are added at the final gate of the hackathon, once the code exists. Planned configuration names are in [`.env.example`](.env.example).
+Requirements: Node.js 20 or newer, npm, and (for a physical Android demo) Expo Go on the phone. Dispatch is mock-only by default.
+
+1. Copy `.env.example` to `.env` in the project root. Keep `DEMO_MODE=true` and `PROVIDER=mock`; leave the whitelist empty unless you have approved team test destinations.
+2. In one terminal, run `cd server`, `npm install`, then `npm start`. The API and responder console are served at `http://localhost:3000`.
+3. In a second terminal, run `cd mobile`, `npm install`, copy `.env.example` to `.env.local`, then start Expo with `npx expo start --lan`.
+4. For a phone on the same Wi-Fi, edit `mobile/.env.local` so `EXPO_PUBLIC_API_BASE_URL` uses the computer's LAN IPv4 address, such as `http://192.168.1.20:3000`; restart Expo and open its LAN URL in Expo Go. `localhost` works for an emulator on the same computer, not a physical phone.
+5. Open `http://localhost:3000` on the computer for the Responder Console. The server's in-memory demo events clear when it restarts.
+
+The demo does not contact family, hospitals, police, or emergency services. Real calls and SMS are not part of the demo flow. For project safety details, see [Safety and honesty](docs/SAFETY_AND_HONESTY.md).
 
 ## Safety and honesty
 
